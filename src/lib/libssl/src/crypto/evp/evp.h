@@ -382,6 +382,8 @@ struct evp_cipher_st {
 #define		EVP_CTRL_AEAD_SET_MAC_KEY	0x17
 /* Set the GCM invocation field, decrypt only */
 #define		EVP_CTRL_GCM_SET_IV_INV		0x18
+/* Set the S-BOX NID for GOST ciphers */
+#define		EVP_CTRL_GOST_SET_SBOX		0x19
 
 /* GCM TLS constants */
 /* Length of fixed part of IV derived from PRF */
@@ -803,6 +805,12 @@ const EVP_CIPHER *EVP_camellia_256_ofb(void);
 
 #ifndef OPENSSL_NO_CHACHA
 const EVP_CIPHER *EVP_chacha20(void);
+#endif
+
+#ifndef OPENSSL_NO_GOST
+const EVP_CIPHER *EVP_gost2814789_ecb(void);
+const EVP_CIPHER *EVP_gost2814789_cfb64(void);
+const EVP_CIPHER *EVP_gost2814789_cnt(void);
 #endif
 
 void OPENSSL_add_all_algorithms_noconf(void);

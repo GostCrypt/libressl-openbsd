@@ -935,3 +935,5 @@ brainpoolP512r1		934
 brainpoolP512t1		935
 FRP256v1		936
 chacha20		937
+gost89_ecb		938
+gost89_cbc		939

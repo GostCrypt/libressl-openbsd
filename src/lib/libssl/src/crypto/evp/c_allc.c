@@ -225,4 +225,10 @@ OpenSSL_add_all_ciphers(void)
 #ifndef OPENSSL_NO_CHACHA
 	EVP_add_cipher(EVP_chacha20());
 #endif
+
+#ifndef OPENSSL_NO_GOST
+	EVP_add_cipher(EVP_gost2814789_ecb());
+	EVP_add_cipher(EVP_gost2814789_cfb64());
+	EVP_add_cipher(EVP_gost2814789_cnt());
+#endif
 }
