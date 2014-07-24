@@ -54,6 +54,7 @@
 #include <openssl/opensslconf.h>
 
 #ifndef OPENSSL_NO_GOST
+#include <openssl/objects.h>
 #include <openssl/gost.h>
 
 #include "gost_locl.h"
@@ -129,6 +130,7 @@ void Gost2814789_decrypt(const unsigned char *in, unsigned char *out,
 }
 
 static void Gost2814789_mac(const unsigned char *in,
+		unsigned char *mac,
 		GOST2814789_KEY *key)
 {
 	unsigned int n1, n2; /* As named in the GOST */
@@ -136,9 +138,9 @@ static void Gost2814789_mac(const unsigned char *in,
 	int i;
 
 	for (i = 0; i < 8; i++)
-		key->buf[i] ^= in[i];
+		mac[i] ^= in[i];
 
-	p = key->buf;
+	p = mac;
 	c2l(p, n1);
 	c2l(p, n2);
 
@@ -153,7 +155,7 @@ static void Gost2814789_mac(const unsigned char *in,
 	n2 ^= f(key, n1 + key->key[4]); n1 ^= f(key, n2 + key->key[5]);
 	n2 ^= f(key, n1 + key->key[6]); n1 ^= f(key, n2 + key->key[7]);
 
-	p = key->buf;
+	p = mac;
 	l2c(n1, p);
 	l2c(n2, p);
 }
@@ -184,13 +186,15 @@ static inline void Gost2814789_encrypt_mesh(unsigned char *iv, GOST2814789_KEY *
 	key->count += 8;
 }
 
-static inline void Gost2814789_mac_mesh(const unsigned char *data, GOST2814789_KEY *key)
+static inline void Gost2814789_mac_mesh(const unsigned char *data,
+		unsigned char *mac,
+		GOST2814789_KEY *key)
 {
 	if (key->key_meshing && key->count == 1024) {
 		Gost2814789_cryptopro_key_mesh(key);
 		key->count = 0;
 	}
-	Gost2814789_mac(data, key);
+	Gost2814789_mac(data, mac, key);
 	key->count += 8;
 }
 
@@ -385,3 +389,65 @@ void Gost2814789_cnt_encrypt(const unsigned char *in, unsigned char *out,
 
 	*num=n;
 }
+
+int GOST2814789IMIT_Init(GOST2814789IMIT_CTX *c, int nid)
+{
+	c->Nl = c->Nh = c->num = 0;
+	memset(c->mac, 0, 8);
+	return Gost2814789_set_sbox(&c->cipher, nid);
+}
+
+static void GOST2814789IMIT_block_data_order(GOST2814789IMIT_CTX *ctx, const void *p, size_t num)
+{
+	int i;
+	for (i = 0; i < num; i++) {
+		Gost2814789_mac_mesh(p, ctx->mac, &ctx->cipher);
+		p += 8;
+	}
+}
+
+#define DATA_ORDER_IS_LITTLE_ENDIAN
+
+#define HASH_CBLOCK	GOST2814789IMIT_CBLOCK
+#define HASH_LONG	GOST2814789IMIT_LONG
+#define HASH_CTX	GOST2814789IMIT_CTX
+#define HASH_UPDATE	GOST2814789IMIT_Update
+#define HASH_TRANSFORM	GOST2814789IMIT_Transform
+#define HASH_NO_FINAL	1
+#define HASH_BLOCK_DATA_ORDER	GOST2814789IMIT_block_data_order
+
+#include "md32_common.h"
+
+int GOST2814789IMIT_Final(unsigned char *md, GOST2814789IMIT_CTX *c)
+{
+	if (c->num) {
+		memset(c->data + c->num, 0, 8 - c->num);
+		Gost2814789_mac_mesh(c->data, c->mac, &c->cipher);
+	}
+	if (c->Nl <= 8 * 8 && c->Nl > 0 && c->Nh == 0) {
+		memset(c->data, 0, 8);
+		Gost2814789_mac_mesh(c->data, c->mac, &c->cipher);
+	}
+	memcpy(md, c->mac, 4);
+	return 1;
+}
+
+unsigned char *GOST2814789IMIT(const unsigned char *d, size_t n,
+		unsigned char *md, int nid,
+		const unsigned char *key, const unsigned char *iv)
+{
+	GOST2814789IMIT_CTX c;
+	static unsigned char m[GOST2814789IMIT_LENGTH];
+
+	if (md == NULL)
+		md = m;
+	GOST2814789IMIT_Init(&c, nid);
+	memcpy(c.mac, iv, 8);
+	Gost2814789_set_key(&c.cipher, key, 256);
+	GOST2814789IMIT_Update(&c, d, n);
+	GOST2814789IMIT_Final(md, &c);
+	OPENSSL_cleanse(&c, sizeof(c));
+	return (md);
+}
+
+#endif

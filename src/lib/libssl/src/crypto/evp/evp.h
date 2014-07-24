@@ -213,6 +213,7 @@ typedef int evp_verify_method(int type, const unsigned char *m,
 
 #define	EVP_MD_CTRL_DIGALGID			0x1
 #define	EVP_MD_CTRL_MICALG			0x2
+#define	EVP_MD_CTRL_SET_KEY			0x3
 
 /* Minimum Algorithm specific ctrl value */
 

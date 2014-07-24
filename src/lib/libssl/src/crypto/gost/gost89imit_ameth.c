@@ -49,61 +49,40 @@
  * ====================================================================
  */
 
-#ifndef HEADER_GOST_H
-#define HEADER_GOST_H
-
 #include <openssl/opensslconf.h>
 
-#ifdef OPENSSL_NO_GOST
-#error GOST is disabled.
-#endif
+#ifndef OPENSSL_NO_GOST
+#include <openssl/evp.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "asn1_locl.h"
 
-typedef struct gost2814789_key_st {
-	unsigned int key[8];
-	unsigned int k87[256],k65[256],k43[256],k21[256];
-	unsigned int count;
-	unsigned key_meshing : 1;
-} GOST2814789_KEY;
-
-int Gost2814789_set_sbox(GOST2814789_KEY *key, int nid);
-int Gost2814789_set_key(GOST2814789_KEY *key,
-		const unsigned char *userKey, const int bits);
-void Gost2814789_ecb_encrypt(const unsigned char *in, unsigned char *out,
-	GOST2814789_KEY *key, const int enc);
-void Gost2814789_cfb64_encrypt(const unsigned char *in, unsigned char *out,
-	size_t length, GOST2814789_KEY *key,
-	unsigned char *ivec, int *num, const int enc);
-void Gost2814789_cnt_encrypt(const unsigned char *in, unsigned char *out,
-	size_t length, GOST2814789_KEY *key,
-	unsigned char *ivec, unsigned char *cnt_buf, int *num);
-
-#define GOST2814789IMIT_LENGTH 4
-#define GOST2814789IMIT_CBLOCK 8
-#define GOST2814789IMIT_LONG unsigned int
-
-typedef struct GOST2814789IMITstate_st {
-	GOST2814789IMIT_LONG	Nl, Nh;
-	unsigned char		data[GOST2814789IMIT_CBLOCK];
-	unsigned int		num;
-
-	GOST2814789_KEY		cipher;
-	unsigned char		mac[GOST2814789IMIT_CBLOCK];
-} GOST2814789IMIT_CTX;
-
-/* Note, also removed second parameter and removed dctx->cipher setting */
-int GOST2814789IMIT_Init(GOST2814789IMIT_CTX *c, int nid);
-int GOST2814789IMIT_Update(GOST2814789IMIT_CTX *c, const void *data, size_t len);
-int GOST2814789IMIT_Final(unsigned char *md, GOST2814789IMIT_CTX *c);
-void GOST2814789IMIT_Transform(GOST2814789IMIT_CTX *c, const unsigned char *data);
-unsigned char *GOST2814789IMIT(const unsigned char *d, size_t n,
-		unsigned char *md, int nid,
-		const unsigned char *key, const unsigned char *iv);
-
-#ifdef  __cplusplus
+static void mackey_free_gost(EVP_PKEY *pk)
+{
+	if (pk->pkey.ptr) {
+		free(pk->pkey.ptr);
+	}
 }
-#endif
+
+static int mac_ctrl_gost(EVP_PKEY *pkey, int op, long arg1, void *arg2)
+{
+	switch (op) {
+	case ASN1_PKEY_CTRL_DEFAULT_MD_NID:
+		*(int *)arg2 = NID_id_Gost28147_89_MAC;
+		return 2;
+	}
+	return -2;
+}
+
+const EVP_PKEY_ASN1_METHOD gostimit_asn1_meth = {
+	.pkey_id = EVP_PKEY_GOSTIMIT,
+	.pkey_base_id = EVP_PKEY_GOSTIMIT,
+	.pkey_flags = ASN1_PKEY_SIGPARAM_NULL,
+
+	.pem_str = "GOST-MAC",
+	.info = "GOST 28147-89 MAC",
+
+	.pkey_free = mackey_free_gost,
+	.pkey_ctrl = mac_ctrl_gost,
+};
+
 #endif
