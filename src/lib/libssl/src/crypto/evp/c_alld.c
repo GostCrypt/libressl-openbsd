@@ -95,6 +95,9 @@ OpenSSL_add_all_digests(void)
 	EVP_add_digest(EVP_ecdsa());
 #endif
 #endif
+#ifndef OPENSSL_NO_GOST
+	EVP_add_digest(EVP_gostr341194());
+#endif
 #if !defined(OPENSSL_NO_MDC2) && !defined(OPENSSL_NO_DES)
 	EVP_add_digest(EVP_mdc2());
 #endif
