@@ -107,6 +107,7 @@
 #define EVP_PKEY_DSA4	NID_dsaWithSHA1_2
 #define EVP_PKEY_DH	NID_dhKeyAgreement
 #define EVP_PKEY_EC	NID_X9_62_id_ecPublicKey
+#define EVP_PKEY_GOSTIMIT NID_id_Gost28147_89_MAC
 #define EVP_PKEY_HMAC	NID_hmac
 #define EVP_PKEY_CMAC	NID_cmac
 
@@ -214,6 +215,7 @@ typedef int evp_verify_method(int type, const unsigned char *m,
 #define	EVP_MD_CTRL_DIGALGID			0x1
 #define	EVP_MD_CTRL_MICALG			0x2
 #define	EVP_MD_CTRL_SET_KEY			0x3
+#define	EVP_MD_CTRL_GOST_SET_SBOX		0x4
 
 /* Minimum Algorithm specific ctrl value */
 
@@ -670,6 +672,7 @@ const EVP_MD *EVP_whirlpool(void);
 #endif
 #ifndef OPENSSL_NO_GOST
 const EVP_MD *EVP_gostr341194(void);
+const EVP_MD *EVP_gost2814789imit(void);
 #endif
 const EVP_CIPHER *EVP_enc_null(void);		/* does nothing :-) */
 #ifndef OPENSSL_NO_DES
