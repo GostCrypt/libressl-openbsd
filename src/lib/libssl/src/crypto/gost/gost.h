@@ -103,6 +103,29 @@ unsigned char *GOST2814789IMIT(const unsigned char *d, size_t n,
 		unsigned char *md, int nid,
 		const unsigned char *key, const unsigned char *iv);
 
+#define GOSTR341194_LONG unsigned int
+
+#define GOSTR341194_LENGTH	32
+#define GOSTR341194_CBLOCK	32
+#define GOSTR341194_LBLOCK	(GOSTR341194_CBLOCK/4)
+
+typedef struct GOSTR341194state_st {
+	GOSTR341194_LONG	Nl, Nh;
+	GOSTR341194_LONG	data[GOSTR341194_LBLOCK];
+	unsigned int		num;
+
+	GOST2814789_KEY		cipher;
+	unsigned char		H[GOSTR341194_CBLOCK];
+	unsigned char		S[GOSTR341194_CBLOCK];
+} GOSTR341194_CTX;
+
+/* Note, also removed second parameter and removed dctx->cipher setting */
+int GOSTR341194_Init(GOSTR341194_CTX *c, int nid);
+int GOSTR341194_Update(GOSTR341194_CTX *c, const void *data, size_t len);
+int GOSTR341194_Final(unsigned char *md, GOSTR341194_CTX *c);
+void GOSTR341194_Transform(GOSTR341194_CTX *c, const unsigned char *data);
+unsigned char *GOSTR341194(const unsigned char *d, size_t n,unsigned char *md, int nid);
+
 #ifdef  __cplusplus
 }
 #endif
