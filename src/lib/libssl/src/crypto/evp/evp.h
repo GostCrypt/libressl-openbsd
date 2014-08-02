@@ -107,6 +107,7 @@
 #define EVP_PKEY_DSA4	NID_dsaWithSHA1_2
 #define EVP_PKEY_DH	NID_dhKeyAgreement
 #define EVP_PKEY_EC	NID_X9_62_id_ecPublicKey
+#define EVP_PKEY_GOSTR01 NID_id_GostR3410_2001
 #define EVP_PKEY_GOSTIMIT NID_id_Gost28147_89_MAC
 #define EVP_PKEY_HMAC	NID_hmac
 #define EVP_PKEY_CMAC	NID_cmac
