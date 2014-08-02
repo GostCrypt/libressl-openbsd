@@ -58,6 +58,8 @@
 #error GOST is disabled.
 #endif
 
+#include <openssl/asn1t.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -80,6 +82,13 @@ void Gost2814789_cfb64_encrypt(const unsigned char *in, unsigned char *out,
 void Gost2814789_cnt_encrypt(const unsigned char *in, unsigned char *out,
 	size_t length, GOST2814789_KEY *key,
 	unsigned char *ivec, unsigned char *cnt_buf, int *num);
+
+typedef struct {
+	ASN1_OCTET_STRING *iv;
+	ASN1_OBJECT *enc_param_set;
+} GOST_CIPHER_PARAMS;
+
+DECLARE_ASN1_FUNCTIONS(GOST_CIPHER_PARAMS)
 
 #define GOST2814789IMIT_LENGTH 4
 #define GOST2814789IMIT_CBLOCK 8
