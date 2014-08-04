@@ -49,47 +49,88 @@
  * ====================================================================
  */
 
-#ifndef HEADER_GOST_LOCL_H
-#define HEADER_GOST_LOCL_H
+#include <string.h>
 
-/* Internal representation of GOST substitution blocks */
-typedef struct {
-	unsigned char k8[16];
-	unsigned char k7[16];
-	unsigned char k6[16];
-	unsigned char k5[16];
-	unsigned char k4[16];
-	unsigned char k3[16];
-	unsigned char k2[16];
-	unsigned char k1[16];
-} gost_subst_block;		
+#include <openssl/opensslconf.h>
 
-#if defined(__i386) || defined(__i386__) || defined(__x86_64) || defined(__x86_64__)
-#  define c2l(c,l)	((l)=*((const unsigned int *)(c)), (c)+=4)
-#  define l2c(l,c)	(*((unsigned int *)(c))=(l), (c)+=4)
-#else
-#define c2l(c,l)	(l =(((unsigned long)(*((c)++)))    ),		\
-			 l|=(((unsigned long)(*((c)++)))<< 8),		\
-			 l|=(((unsigned long)(*((c)++)))<<16),		\
-			 l|=(((unsigned long)(*((c)++)))<<24))
-#define l2c(l,c)	(*((c)++)=(unsigned char)(((l)    )&0xff),	\
-			 *((c)++)=(unsigned char)(((l)>> 8)&0xff),	\
-			 *((c)++)=(unsigned char)(((l)>>16)&0xff),	\
-			 *((c)++)=(unsigned char)(((l)>>24)&0xff))
-#endif
+#ifndef OPENSSL_NO_GOST
 
-extern void Gost2814789_encrypt(const unsigned char *in, unsigned char *out,
-	const GOST2814789_KEY *key);
-extern void Gost2814789_decrypt(const unsigned char *in, unsigned char *out,
-	const GOST2814789_KEY *key);
-extern void Gost2814789_cryptopro_key_mesh(GOST2814789_KEY *key);
+#include <openssl/gost.h>
 
-/* GOST 28147-89 key wrapping */
-extern int key_unwrap_crypto_pro(int nid, const unsigned char *keyExchangeKey,
-		       const unsigned char *wrappedKey,
-		       unsigned char *sessionKey);
-extern int key_wrap_crypto_pro(int nid, const unsigned char *keyExchangeKey,
+#include "gost_locl.h"
+
+static void key_diversify_crypto_pro(GOST2814789_KEY * ctx, const unsigned char *inputKey,
+			   const unsigned char *ukm, unsigned char *outputKey)
+{
+
+	unsigned long k, s1, s2;
+	int i, mask;
+	unsigned char S[8];
+	unsigned char *p;
+	memcpy(outputKey, inputKey, 32);
+	for (i = 0; i < 8; i++) {
+		/* Make array of integers from key */
+		/* Compute IV S */
+		s1 = 0, s2 = 0;
+		p = outputKey;
+		for (mask = 1; mask < 256; mask <<= 1) {
+			c2l(p, k);
+			if (mask & ukm[i]) {
+				s1 += k;
+			} else {
+				s2 += k;
+			}
+		}
+		p = S;
+		l2c (s1, p);
+		l2c (s2, p);
+		Gost2814789_set_key(ctx, outputKey, 256);
+		mask = 0;
+		Gost2814789_cfb64_encrypt(outputKey, outputKey, 32, ctx, S, &mask, 1);
+	}
+}
+
+int key_wrap_crypto_pro(int nid, const unsigned char *keyExchangeKey,
 		     const unsigned char *ukm, const unsigned char *sessionKey,
-		     unsigned char *wrappedKey);
+		     unsigned char *wrappedKey)
+{
+	GOST2814789_KEY ctx;
+	unsigned char kek_ukm[32];
+
+	Gost2814789_set_sbox(&ctx, nid);
+	key_diversify_crypto_pro(&ctx, keyExchangeKey, ukm, kek_ukm);
+	Gost2814789_set_key(&ctx, kek_ukm, 256);
+	memcpy(wrappedKey, ukm, 8);
+	Gost2814789_encrypt(sessionKey +  0, wrappedKey + 8 +  0, &ctx);
+	Gost2814789_encrypt(sessionKey +  8, wrappedKey + 8 +  8, &ctx);
+	Gost2814789_encrypt(sessionKey + 16, wrappedKey + 8 + 16, &ctx);
+	Gost2814789_encrypt(sessionKey + 24, wrappedKey + 8 + 24, &ctx);
+	GOST2814789IMIT(sessionKey, 32, wrappedKey + 40, nid, kek_ukm, ukm);
+	return 1;
+}
+
+int key_unwrap_crypto_pro(int nid, const unsigned char *keyExchangeKey,
+		       const unsigned char *wrappedKey,
+		       unsigned char *sessionKey)
+{
+	unsigned char kek_ukm[32], cek_mac[4];
+	GOST2814789_KEY ctx;
+
+	Gost2814789_set_sbox(&ctx, nid);
+	/* First 8 bytes of wrapped Key is ukm */
+	key_diversify_crypto_pro(&ctx, keyExchangeKey, wrappedKey, kek_ukm);
+	Gost2814789_set_key(&ctx, kek_ukm, 256);
+	Gost2814789_decrypt(wrappedKey + 8 +  0, sessionKey +  0, &ctx);
+	Gost2814789_decrypt(wrappedKey + 8 +  8, sessionKey +  8, &ctx);
+	Gost2814789_decrypt(wrappedKey + 8 + 16, sessionKey + 16, &ctx);
+	Gost2814789_decrypt(wrappedKey + 8 + 24, sessionKey + 24, &ctx);
+
+	GOST2814789IMIT(sessionKey, 32, cek_mac, nid, kek_ukm, wrappedKey);
+	if (memcmp(cek_mac, wrappedKey + 40, 4)) {
+		printf("IMIT Missmatch!\n");
+		return 0;
+	}
+	return 1;
+}
 
 #endif
