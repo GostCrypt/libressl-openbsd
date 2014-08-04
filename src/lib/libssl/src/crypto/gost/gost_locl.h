@@ -52,6 +52,9 @@
 #ifndef HEADER_GOST_LOCL_H
 #define HEADER_GOST_LOCL_H
 
+#include <openssl/ec.h>
+#include <openssl/ecdsa.h>
+
 /* Internal representation of GOST substitution blocks */
 typedef struct {
 	unsigned char k8[16];
@@ -91,5 +94,15 @@ extern int key_unwrap_crypto_pro(int nid, const unsigned char *keyExchangeKey,
 extern int key_wrap_crypto_pro(int nid, const unsigned char *keyExchangeKey,
 		     const unsigned char *ukm, const unsigned char *sessionKey,
 		     unsigned char *wrappedKey);
+/* Pkey part */
+extern int gost2001_compute_public(GOST_KEY * ec);
+extern ECDSA_SIG *gost2001_do_sign(BIGNUM * md, GOST_KEY * eckey);
+extern int gost2001_do_verify(BIGNUM * md, ECDSA_SIG * sig, GOST_KEY * ec);
+extern int gost2001_keygen(GOST_KEY * ec);
+extern void VKO_compute_key(BIGNUM * X, BIGNUM * Y,
+			    const GOST_KEY * pkey, GOST_KEY * priv_key,
+			    const BIGNUM * ukm);
+extern BIGNUM *GOST_le2bn(const unsigned char * buf, size_t len, BIGNUM * bn);
+extern int GOST_bn2le(BIGNUM * bn, unsigned char * buf, int len);
 
 #endif
