@@ -937,3 +937,6 @@ FRP256v1		936
 chacha20		937
 gost89_ecb		938
 gost89_cbc		939
+tc26		940
+id_tc26_gost3411_2012_256		941
+id_tc26_gost3411_2012_512		942
