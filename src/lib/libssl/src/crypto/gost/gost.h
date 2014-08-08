@@ -136,6 +136,40 @@ int GOSTR341194_Final(unsigned char *md, GOSTR341194_CTX *c);
 void GOSTR341194_Transform(GOSTR341194_CTX *c, const unsigned char *data);
 unsigned char *GOSTR341194(const unsigned char *d, size_t n,unsigned char *md, int nid);
 
+#if defined(_LP64)
+#define STREEBOG_LONG64 unsigned long
+#define U64(C)     C##UL
+#else
+#define STREEBOG_LONG64 unsigned long long
+#define U64(C)     C##ULL
+#endif
+
+#define STREEBOG_LBLOCK 8
+#define STREEBOG_CBLOCK 64
+#define STREEBOG256_LENGTH 32
+#define STREEBOG512_LENGTH 64
+
+typedef struct STREEBOGstate_st {
+	STREEBOG_LONG64	data[STREEBOG_LBLOCK];
+	unsigned int	num;
+	unsigned int	md_len;
+	STREEBOG_LONG64	h[STREEBOG_LBLOCK];
+	STREEBOG_LONG64 N[STREEBOG_LBLOCK];
+	STREEBOG_LONG64 Sigma[STREEBOG_LBLOCK];
+} STREEBOG_CTX;
+
+int STREEBOG256_Init(STREEBOG_CTX *c);
+int STREEBOG256_Update(STREEBOG_CTX *c, const void *data, size_t len);
+int STREEBOG256_Final(unsigned char *md, STREEBOG_CTX *c);
+void STREEBOG256_Transform(STREEBOG_CTX *c, const unsigned char *data);
+unsigned char *STREEBOG256(const unsigned char *d, size_t n,unsigned char *md);
+
+int STREEBOG512_Init(STREEBOG_CTX *c);
+int STREEBOG512_Update(STREEBOG_CTX *c, const void *data, size_t len);
+int STREEBOG512_Final(unsigned char *md, STREEBOG_CTX *c);
+void STREEBOG512_Transform(STREEBOG_CTX *c, const unsigned char *data);
+unsigned char *STREEBOG512(const unsigned char *d, size_t n,unsigned char *md);
+
 typedef struct gost_key_st GOST_KEY;
 GOST_KEY *GOST_KEY_new(void);
 void GOST_KEY_free(GOST_KEY * r);
