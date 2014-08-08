@@ -940,3 +940,5 @@ gost89_cbc		939
 tc26		940
 id_tc26_gost3411_2012_256		941
 id_tc26_gost3411_2012_512		942
+id_tc26_gost_3410_2012_512_paramSetA		943
+id_tc26_gost_3410_2012_512_paramSetB		944

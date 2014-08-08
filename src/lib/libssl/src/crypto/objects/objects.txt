@@ -1321,3 +1321,5 @@ member-body 643 7 1	: tc26
 tc26 1 2 2		: streebog256 : GOST R 34.11-2012 (256 bit)
 !Cname id-tc26-gost3411-2012-512
 tc26 1 2 3		: streebog512 : GOST R 34-11-2012 (512 bit)
+tc26 2 1 2 1		: id-tc26-gost-3410-2012-512-paramSetA
+tc26 2 1 2 2		: id-tc26-gost-3410-2012-512-paramSetB
