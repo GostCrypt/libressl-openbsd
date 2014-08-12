@@ -943,3 +943,7 @@ id_tc26_gost3411_2012_512		942
 id_tc26_gost_3410_2012_512_paramSetA		943
 id_tc26_gost_3410_2012_512_paramSetB		944
 id_tc26_gost_28147_param_Z		945
+id_tc26_gost3410_2012_256		946
+id_tc26_gost3410_2012_512		947
+id_tc26_signwithdigest_gost3410_2012_256		948
+id_tc26_signwithdigest_gost3410_2012_512		949
