@@ -49,63 +49,40 @@
  * ====================================================================
  */
 
-#ifndef HEADER_GOST_LOCL_H
-#define HEADER_GOST_LOCL_H
+#include <strings.h>
 
-#include <openssl/ec.h>
-#include <openssl/ecdsa.h>
+#include <openssl/opensslconf.h>
 
-/* Internal representation of GOST substitution blocks */
-typedef struct {
-	unsigned char k8[16];
-	unsigned char k7[16];
-	unsigned char k6[16];
-	unsigned char k5[16];
-	unsigned char k4[16];
-	unsigned char k3[16];
-	unsigned char k2[16];
-	unsigned char k1[16];
-} gost_subst_block;		
+#ifndef OPENSSL_NO_GOST
+#include <openssl/objects.h>
+#include <openssl/gost.h>
 
-#if defined(__i386) || defined(__i386__) || defined(__x86_64) || defined(__x86_64__)
-#  define c2l(c,l)	((l)=*((const unsigned int *)(c)), (c)+=4)
-#  define l2c(l,c)	(*((unsigned int *)(c))=(l), (c)+=4)
-#else
-#define c2l(c,l)	(l =(((unsigned long)(*((c)++)))    ),		\
-			 l|=(((unsigned long)(*((c)++)))<< 8),		\
-			 l|=(((unsigned long)(*((c)++)))<<16),		\
-			 l|=(((unsigned long)(*((c)++)))<<24))
-#define l2c(l,c)	(*((c)++)=(unsigned char)(((l)    )&0xff),	\
-			 *((c)++)=(unsigned char)(((l)>> 8)&0xff),	\
-			 *((c)++)=(unsigned char)(((l)>>16)&0xff),	\
-			 *((c)++)=(unsigned char)(((l)>>24)&0xff))
-#endif
+#include "gost_locl.h"
 
-extern void Gost2814789_encrypt(const unsigned char *in, unsigned char *out,
-	const GOST2814789_KEY *key);
-extern void Gost2814789_decrypt(const unsigned char *in, unsigned char *out,
-	const GOST2814789_KEY *key);
-extern void Gost2814789_cryptopro_key_mesh(GOST2814789_KEY *key);
+typedef struct GostR3410_params {
+	const char *name;
+	int nid;
+} GostR3410_params;
 
-/* GOST 28147-89 key wrapping */
-extern int key_unwrap_crypto_pro(int nid, const unsigned char *keyExchangeKey,
-		       const unsigned char *wrappedKey,
-		       unsigned char *sessionKey);
-extern int key_wrap_crypto_pro(int nid, const unsigned char *keyExchangeKey,
-		     const unsigned char *ukm, const unsigned char *sessionKey,
-		     unsigned char *wrappedKey);
-/* Pkey part */
-extern int gost2001_compute_public(GOST_KEY * ec);
-extern ECDSA_SIG *gost2001_do_sign(BIGNUM * md, GOST_KEY * eckey);
-extern int gost2001_do_verify(BIGNUM * md, ECDSA_SIG * sig, GOST_KEY * ec);
-extern int gost2001_keygen(GOST_KEY * ec);
-extern void VKO_compute_key(BIGNUM * X, BIGNUM * Y,
-			    const GOST_KEY * pkey, GOST_KEY * priv_key,
-			    const BIGNUM * ukm);
-extern BIGNUM *GOST_le2bn(const unsigned char * buf, size_t len, BIGNUM * bn);
-extern int GOST_bn2le(BIGNUM * bn, unsigned char * buf, int len);
+static const GostR3410_params GostR3410_256_params[] = {
+	{ "A",  NID_id_GostR3410_2001_CryptoPro_A_ParamSet },
+	{ "B",  NID_id_GostR3410_2001_CryptoPro_B_ParamSet },
+	{ "C",  NID_id_GostR3410_2001_CryptoPro_C_ParamSet },
+	{ "0",  NID_id_GostR3410_2001_TestParamSet },
+	{ "XA", NID_id_GostR3410_2001_CryptoPro_XchA_ParamSet },
+	{ "XB", NID_id_GostR3410_2001_CryptoPro_XchB_ParamSet },
+	{ NULL, NID_undef },
+};
 
-/* GOST R 34.10 parameters */
-extern int GostR3410_param_id(const char *value);
+int GostR3410_param_id(const char *value)
+{
+	int i;
+	for (i = 0; GostR3410_256_params[i].nid != NID_undef; i++) {
+		if (!strcasecmp(GostR3410_256_params[i].name, value))
+			return GostR3410_256_params[i].nid;
+	}
+
+	return NID_undef;
+}
 
 #endif
