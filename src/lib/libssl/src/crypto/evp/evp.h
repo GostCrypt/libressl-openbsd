@@ -111,6 +111,8 @@
 #define EVP_PKEY_GOSTIMIT NID_id_Gost28147_89_MAC
 #define EVP_PKEY_HMAC	NID_hmac
 #define EVP_PKEY_CMAC	NID_cmac
+#define EVP_PKEY_GOSTR12_256 NID_id_tc26_gost3410_2012_256
+#define EVP_PKEY_GOSTR12_512 NID_id_tc26_gost3410_2012_512
 
 #ifdef	__cplusplus
 extern "C" {

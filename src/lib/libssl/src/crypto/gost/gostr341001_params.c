@@ -59,6 +59,27 @@
 
 #include "gost_locl.h"
 
+int GostR3410_get_md_digest(int nid)
+{
+	if (nid == NID_id_GostR3411_94_CryptoProParamSet)
+		return NID_id_GostR3411_94;
+	return nid;
+}
+
+int GostR3410_get_pk_digest(int nid)
+{
+	switch (nid) {
+	case NID_id_GostR3411_94_CryptoProParamSet:
+		return NID_id_GostR3410_2001;
+	case NID_id_tc26_gost3411_2012_256:
+		return NID_id_tc26_gost3410_2012_256;
+	case NID_id_tc26_gost3411_2012_512:
+		return NID_id_tc26_gost3410_2012_512;
+	default:
+		return NID_undef;
+	}
+}
+
 typedef struct GostR3410_params {
 	const char *name;
 	int nid;

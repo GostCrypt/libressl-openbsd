@@ -161,11 +161,15 @@ static int pub_cmp_gost01(const EVP_PKEY * a, const EVP_PKEY * b)
 
 static int pkey_size_gost01(const EVP_PKEY * pk)
 {
+	if (GOST_KEY_get_digest(pk->pkey.gost) == NID_id_tc26_gost3411_2012_512)
+		return 128;
 	return 64;
 }
 
 static int pkey_bits_gost01(const EVP_PKEY * pk)
 {
+	if (GOST_KEY_get_digest(pk->pkey.gost) == NID_id_tc26_gost3411_2012_512)
+		return 512;
 	return 256;
 }
 
@@ -231,7 +235,7 @@ static int pub_encode_gost01(X509_PUBKEY * pub, const EVP_PKEY * pk)
 	const GOST_KEY *ec = pk->pkey.gost;
 	int ptype = V_ASN1_UNDEF;
 
-	algobj = OBJ_nid2obj(NID_id_GostR3410_2001);
+	algobj = OBJ_nid2obj(GostR3410_get_pk_digest(GOST_KEY_get_digest(ec)));
 	if (pk->save_parameters) {
 		ASN1_STRING *params = encode_gost01_algor_params(pk);
 		pval = params;
@@ -429,7 +433,7 @@ static int priv_decode_gost01(EVP_PKEY * pk, PKCS8_PRIV_KEY_INFO * p8inf)
 
 static int priv_encode_gost01(PKCS8_PRIV_KEY_INFO * p8, const EVP_PKEY * pk)
 {
-	ASN1_OBJECT *algobj = OBJ_nid2obj(NID_id_GostR3410_2001);
+	ASN1_OBJECT *algobj = OBJ_nid2obj(GostR3410_get_pk_digest(GOST_KEY_get_digest(pk->pkey.gost)));
 	ASN1_STRING *params = encode_gost01_algor_params(pk);
 	unsigned char *priv_buf = NULL;
 	int priv_len;
@@ -561,6 +565,7 @@ static int param_cmp_gost01(const EVP_PKEY * a, const EVP_PKEY * b)
 static int pkey_ctrl_gost01(EVP_PKEY * pkey, int op, long arg1, void *arg2)
 {
 	X509_ALGOR *alg1 = NULL, *alg2 = NULL, *alg3 = NULL;
+	int digest = GOST_KEY_get_digest(pkey->pkey.gost);
 
 	switch (op) {
 	case ASN1_PKEY_CTRL_PKCS7_SIGN:
@@ -584,7 +589,7 @@ static int pkey_ctrl_gost01(EVP_PKEY * pkey, int op, long arg1, void *arg2)
 		break;
 #endif
 	case ASN1_PKEY_CTRL_DEFAULT_MD_NID:
-		*(int *)arg2 = NID_id_GostR3411_94;
+		*(int *)arg2 = GostR3410_get_md_digest(digest);
 		return 2;
 
 	default:
@@ -592,48 +597,60 @@ static int pkey_ctrl_gost01(EVP_PKEY * pkey, int op, long arg1, void *arg2)
 	}
 
 	if (alg1)
-		X509_ALGOR_set0(alg1, OBJ_nid2obj(NID_id_GostR3411_94), V_ASN1_NULL, 0);
+		X509_ALGOR_set0(alg1, OBJ_nid2obj(GostR3410_get_md_digest(digest)), V_ASN1_NULL, 0);
 	if (alg2)
-		X509_ALGOR_set0(alg2, OBJ_nid2obj(NID_id_GostR3410_2001), V_ASN1_NULL, 0);
+		X509_ALGOR_set0(alg2, OBJ_nid2obj(GostR3410_get_pk_digest(digest)), V_ASN1_NULL, 0);
 	if (alg3) {
 		ASN1_STRING *params = encode_gost01_algor_params(pkey);
 		if (!params) {
 			return -1;
 		}
-		X509_ALGOR_set0(alg3, OBJ_nid2obj(NID_id_GostR3410_2001), V_ASN1_SEQUENCE, params);
+		X509_ALGOR_set0(alg3, OBJ_nid2obj(GostR3410_get_pk_digest(digest)), V_ASN1_SEQUENCE, params);
 	}
 
 	return 1;
 }
 
-const EVP_PKEY_ASN1_METHOD gostr01_asn1_meth = {
-	.pkey_id = EVP_PKEY_GOSTR01,
-	.pkey_base_id = EVP_PKEY_GOSTR01,
-	.pkey_flags = ASN1_PKEY_SIGPARAM_NULL,
+const EVP_PKEY_ASN1_METHOD gostr01_asn1_meths[] = {
+	{
+		.pkey_id = EVP_PKEY_GOSTR01,
+		.pkey_base_id = EVP_PKEY_GOSTR01,
+		.pkey_flags = ASN1_PKEY_SIGPARAM_NULL,
 
-	.pem_str = "GOST2001",
-	.info = "GOST R 34.10-2001",
+		.pem_str = "GOST2001",
+		.info = "GOST R 34.10-2001",
 
-	.pkey_free = pkey_free_gost01,
-	.pkey_ctrl = pkey_ctrl_gost01,
+		.pkey_free = pkey_free_gost01,
+		.pkey_ctrl = pkey_ctrl_gost01,
 
-	.priv_decode = priv_decode_gost01,
-	.priv_encode = priv_encode_gost01,
-	.priv_print = priv_print_gost01,
+		.priv_decode = priv_decode_gost01,
+		.priv_encode = priv_encode_gost01,
+		.priv_print = priv_print_gost01,
 
-	.param_decode = param_decode_gost01,
-	.param_encode = param_encode_gost01,
-	.param_missing = param_missing_gost01,
-	.param_copy = param_copy_gost01,
-	.param_cmp = param_cmp_gost01,
-	.param_print = param_print_gost01,
+		.param_decode = param_decode_gost01,
+		.param_encode = param_encode_gost01,
+		.param_missing = param_missing_gost01,
+		.param_copy = param_copy_gost01,
+		.param_cmp = param_cmp_gost01,
+		.param_print = param_print_gost01,
 
-	.pub_decode = pub_decode_gost01,
-	.pub_encode = pub_encode_gost01,
-	.pub_cmp = pub_cmp_gost01,
-	.pub_print = pub_print_gost01,
-	.pkey_size = pkey_size_gost01,
-	.pkey_bits = pkey_bits_gost01,
+		.pub_decode = pub_decode_gost01,
+		.pub_encode = pub_encode_gost01,
+		.pub_cmp = pub_cmp_gost01,
+		.pub_print = pub_print_gost01,
+		.pkey_size = pkey_size_gost01,
+		.pkey_bits = pkey_bits_gost01,
+	},
+	{
+		.pkey_id = EVP_PKEY_GOSTR12_256,
+		.pkey_base_id = EVP_PKEY_GOSTR01,
+		.pkey_flags = ASN1_PKEY_ALIAS
+	},
+	{
+		.pkey_id = EVP_PKEY_GOSTR12_512,
+		.pkey_base_id = EVP_PKEY_GOSTR01,
+		.pkey_flags = ASN1_PKEY_ALIAS
+	},
 };
 
 #endif

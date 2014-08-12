@@ -106,6 +106,8 @@ extern BIGNUM *GOST_le2bn(const unsigned char * buf, size_t len, BIGNUM * bn);
 extern int GOST_bn2le(BIGNUM * bn, unsigned char * buf, int len);
 
 /* GOST R 34.10 parameters */
+extern int GostR3410_get_md_digest(int nid);
+extern int GostR3410_get_pk_digest(int nid);
 extern int GostR3410_param_id(const char *value);
 
 #endif
