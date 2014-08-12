@@ -222,18 +222,18 @@ static int pkey_gost01_sign(EVP_PKEY_CTX * ctx, unsigned char *sig,
 	EVP_PKEY *pkey = EVP_PKEY_CTX_get0_pkey(ctx);
 	struct gost_pmeth_data *pctx = EVP_PKEY_CTX_get_data(ctx);
 	BIGNUM *md;
+	size_t size = GOST_KEY_get_size(pkey->pkey.gost);
 
 	if (!siglen)
 		return 0;
 	if (!sig) {
-		*siglen = 64;	/* better to check size of curve order */
+		*siglen = 2 * size;
 		return 1;
-	} else if (*siglen < 64) {
+	} else if (*siglen < 2 * size) {
 		GOSTerr(GOST_F_PKEY_GOST01_SIGN, EC_R_BUFFER_TOO_SMALL);
 		return 0;
-
 	}
-	OPENSSL_assert(tbs_len == 32);
+	OPENSSL_assert(tbs_len == 32 || tbs_len == 64);
 	md = GOST_le2bn(tbs, tbs_len, NULL);
 	unpacked_sig = gost2001_do_sign(md, pkey->pkey.gost);
 #ifdef DEBUG_SIGN
@@ -248,9 +248,9 @@ static int pkey_gost01_sign(EVP_PKEY_CTX * ctx, unsigned char *sig,
 	}
 	switch (pctx->sig_format) {
 	case GOST_SIG_FORMAT_SR_BE:
-		return pack_signature_cp(unpacked_sig, 32, sig, siglen);
+		return pack_signature_cp(unpacked_sig, size, sig, siglen);
 	case GOST_SIG_FORMAT_RS_LE:
-		return pack_signature_le(unpacked_sig, 32, sig, siglen);
+		return pack_signature_le(unpacked_sig, size, sig, siglen);
 	default:
 		ECDSA_SIG_free(unpacked_sig);
 		return -1;
@@ -302,6 +302,7 @@ static int gost01_VKO_key(EVP_PKEY * pub_key, EVP_PKEY * priv_key,
 {
 	unsigned char hashbuf[128];
 	int digest_nid;
+	int ret;
 	BN_CTX *ctx = BN_CTX_new();
 	BIGNUM *UKM, *X, *Y;
 
@@ -314,13 +315,32 @@ static int gost01_VKO_key(EVP_PKEY * pub_key, EVP_PKEY * priv_key,
 
 	digest_nid = GOST_KEY_get_digest(priv_key->pkey.gost);
 	VKO_compute_key(X, Y, pub_key->pkey.gost, priv_key->pkey.gost, UKM);
-	GOST_bn2le(X, hashbuf, 32);
-	GOST_bn2le(Y, hashbuf + 32, 32);
-	GOSTR341194(hashbuf, 64, key, digest_nid);
+	switch (digest_nid) {
+	case NID_id_GostR3411_94_CryptoProParamSet:
+		GOST_bn2le(X, hashbuf, 32);
+		GOST_bn2le(Y, hashbuf + 32, 32);
+		GOSTR341194(hashbuf, 64, key, digest_nid);
+		ret = 1;
+		break;
+	case NID_id_tc26_gost3411_2012_256:
+		GOST_bn2le(X, hashbuf, 32);
+		GOST_bn2le(Y, hashbuf + 32, 32);
+		STREEBOG256(hashbuf, 64, key);
+		ret = 1;
+		break;
+	case NID_id_tc26_gost3411_2012_512:
+		GOST_bn2le(X, hashbuf, 64);
+		GOST_bn2le(Y, hashbuf + 64, 64);
+		STREEBOG256(hashbuf, 128, key);
+		ret = 1;
+		break;
+	default:
+		ret = -2;
+		break;
+	}
 	BN_CTX_end(ctx);
 	BN_CTX_free(ctx);
-
-	return 1;
+	return ret;
 }
 
 int pkey_gost01_decrypt(EVP_PKEY_CTX * pctx, unsigned char *key,
@@ -517,13 +537,12 @@ static int pkey_gost01_ctrl(EVP_PKEY_CTX * ctx, int type, int p1, void *p2)
 	struct gost_pmeth_data *pctx = EVP_PKEY_CTX_get_data(ctx);
 	switch (type) {
 	case EVP_PKEY_CTRL_MD:
-		if (EVP_MD_type(p2) != NID_id_GostR3411_94) {
+		if (EVP_MD_type(p2) != GostR3410_get_md_digest(pctx->digest_nid)) {
 			GOSTerr(GOST_F_PKEY_GOST01_CTRL, GOST_R_INVALID_DIGEST_TYPE);
 			return 0;
 		}
 		pctx->md = p2;
 		return 1;
-
 	case EVP_PKEY_CTRL_PKCS7_ENCRYPT:
 	case EVP_PKEY_CTRL_PKCS7_DECRYPT:
 	case EVP_PKEY_CTRL_PKCS7_SIGN:
@@ -577,12 +596,18 @@ static int pkey_gost01_ctrl_str(EVP_PKEY_CTX * ctx,
 				const char *type, const char *value)
 {
 	int param_nid = NID_undef;
+	int digest_nid = NID_undef;
+
 	if (!strcmp(type, "paramset")) {
 		if (!value) {
 			return 0;
 		}
-		if (param_nid == NID_undef)
-			param_nid = GostR3410_param_id(value);
+		if (!pkey_gost01_ctrl(ctx, EVP_PKEY_CTRL_GOST_GET_DIGEST, 0, &digest_nid))
+			return 0;
+		if (digest_nid == NID_id_tc26_gost3411_2012_512)
+			param_nid = GostR3410_512_param_id(value);
+		else
+			param_nid = GostR3410_256_param_id(value);
 		if (param_nid == NID_undef)
 			param_nid = OBJ_txt2nid(value);
 		if (param_nid == NID_undef)
@@ -590,6 +615,22 @@ static int pkey_gost01_ctrl_str(EVP_PKEY_CTX * ctx,
 
 		return pkey_gost01_ctrl(ctx, EVP_PKEY_CTRL_GOST_PARAMSET,
 				      param_nid, NULL);
+	}
+	if (!strcmp(type, "dgst")) {
+		if (!value)
+			return 0;
+		else if (!strcmp(value, "gost94") || !strcmp(value, "md_gost94"))
+			digest_nid = NID_id_GostR3411_94_CryptoProParamSet;
+		else if (!strcmp(value, "streebog256"))
+			digest_nid = NID_id_tc26_gost3411_2012_256;
+		else if (!strcmp(value, "streebog512"))
+			digest_nid = NID_id_tc26_gost3411_2012_512;
+
+		if (digest_nid == NID_undef)
+			return 0;
+
+		return pkey_gost01_ctrl(ctx, EVP_PKEY_CTRL_GOST_SET_DIGEST,
+				        digest_nid, NULL);
 	}
 	return -2;
 }

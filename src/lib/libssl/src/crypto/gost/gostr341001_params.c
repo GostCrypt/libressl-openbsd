@@ -95,12 +95,29 @@ static const GostR3410_params GostR3410_256_params[] = {
 	{ NULL, NID_undef },
 };
 
-int GostR3410_param_id(const char *value)
+static const GostR3410_params GostR3410_512_params[] = {
+	{ "A",  NID_id_tc26_gost_3410_2012_512_paramSetA },
+	{ "B",  NID_id_tc26_gost_3410_2012_512_paramSetB },
+	{ NULL, NID_undef },
+};
+
+int GostR3410_256_param_id(const char *value)
 {
 	int i;
 	for (i = 0; GostR3410_256_params[i].nid != NID_undef; i++) {
 		if (!strcasecmp(GostR3410_256_params[i].name, value))
 			return GostR3410_256_params[i].nid;
+	}
+
+	return NID_undef;
+}
+
+int GostR3410_512_param_id(const char *value)
+{
+	int i;
+	for (i = 0; GostR3410_512_params[i].nid != NID_undef; i++) {
+		if (!strcasecmp(GostR3410_512_params[i].name, value))
+			return GostR3410_512_params[i].nid;
 	}
 
 	return NID_undef;
