@@ -1323,3 +1323,4 @@ tc26 1 2 2		: streebog256 : GOST R 34.11-2012 (256 bit)
 tc26 1 2 3		: streebog512 : GOST R 34-11-2012 (512 bit)
 tc26 2 1 2 1		: id-tc26-gost-3410-2012-512-paramSetA
 tc26 2 1 2 2		: id-tc26-gost-3410-2012-512-paramSetB
+tc26 2 5 1 1		: id-tc26-gost-28147-param-Z
