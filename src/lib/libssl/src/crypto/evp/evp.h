@@ -544,6 +544,7 @@ void EVP_MD_CTX_destroy(EVP_MD_CTX *ctx);
 int EVP_MD_CTX_copy_ex(EVP_MD_CTX *out, const EVP_MD_CTX *in);
 void EVP_MD_CTX_set_flags(EVP_MD_CTX *ctx, int flags);
 void EVP_MD_CTX_clear_flags(EVP_MD_CTX *ctx, int flags);
+int EVP_MD_CTX_ctrl(EVP_MD_CTX *ctx, int type, int arg, void *ptr);
 int EVP_MD_CTX_test_flags(const EVP_MD_CTX *ctx, int flags);
 int EVP_DigestInit_ex(EVP_MD_CTX *ctx, const EVP_MD *type, ENGINE *impl);
 int EVP_DigestUpdate(EVP_MD_CTX *ctx, const void *d, size_t cnt);
@@ -1364,6 +1365,7 @@ void ERR_load_EVP_strings(void);
 #define EVP_F_EVP_DIGESTINIT_EX				 128
 #define EVP_F_EVP_ENCRYPTFINAL_EX			 127
 #define EVP_F_EVP_MD_CTX_COPY_EX			 110
+#define EVP_F_EVP_MD_CTX_CTRL				 195
 #define EVP_F_EVP_MD_SIZE				 162
 #define EVP_F_EVP_OPENINIT				 102
 #define EVP_F_EVP_PBE_ALG_ADD				 115
