@@ -138,6 +138,9 @@ struct evp_pkey_st {
 #ifndef OPENSSL_NO_EC
 		struct ec_key_st *ec;	/* ECC */
 #endif
+#ifndef OPENSSL_NO_GOST
+		struct gost_key_st *gost; /* GOST */
+#endif
 	} pkey;
 	int save_parameters;
 	STACK_OF(X509_ATTRIBUTE) *attributes; /* [ 0 ] */
@@ -454,6 +457,11 @@ typedef int (EVP_PBE_KEYGEN)(EVP_CIPHER_CTX *ctx, const char *pass, int passlen,
 #ifndef OPENSSL_NO_EC
 #define EVP_PKEY_assign_EC_KEY(pkey,eckey) EVP_PKEY_assign((pkey),EVP_PKEY_EC,\
                                         (char *)(eckey))
+#endif
+
+#ifndef OPENSSL_NO_GOST
+#define EVP_PKEY_assign_GOST(pkey,gostkey) EVP_PKEY_assign((pkey),EVP_PKEY_GOSTR01,\
+                                        (char *)(gostkey))
 #endif
 
 /* Add some extra combinations */
@@ -885,6 +893,9 @@ struct dh_st *EVP_PKEY_get1_DH(EVP_PKEY *pkey);
 struct ec_key_st;
 int EVP_PKEY_set1_EC_KEY(EVP_PKEY *pkey, struct ec_key_st *key);
 struct ec_key_st *EVP_PKEY_get1_EC_KEY(EVP_PKEY *pkey);
+#endif
+#ifndef OPENSSL_NO_GOST
+struct gost_key_st;
 #endif
 
 EVP_PKEY *EVP_PKEY_new(void);
