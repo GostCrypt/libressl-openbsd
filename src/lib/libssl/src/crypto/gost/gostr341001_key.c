@@ -269,7 +269,9 @@ int GOST_KEY_get_digest(const GOST_KEY * key)
 }
 int GOST_KEY_set_digest(GOST_KEY * key, int digest_nid)
 {
-	if (digest_nid == NID_id_GostR3411_94_CryptoProParamSet) {
+	if (digest_nid == NID_id_GostR3411_94_CryptoProParamSet ||
+	    digest_nid == NID_id_tc26_gost3411_2012_256 ||
+	    digest_nid == NID_id_tc26_gost3411_2012_512) {
 		key->digest_nid = digest_nid;
 		return 1;
 	}
