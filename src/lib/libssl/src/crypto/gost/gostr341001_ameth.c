@@ -428,31 +428,26 @@ priv_decode_gost01(EVP_PKEY *pk, PKCS8_PRIV_KEY_INFO *p8inf)
 	p = pkey_buf;
 	if (V_ASN1_OCTET_STRING == *p) {
 		/* New format - Little endian octet string */
-		unsigned char rev_buf[32];
-		int i;
 		ASN1_OCTET_STRING *s =
 		    d2i_ASN1_OCTET_STRING(NULL, &p, priv_len);
 
-		if (s == NULL || s->length != 32) {
+		if (s == NULL) {
 			GOSTerr(GOST_F_PRIV_DECODE_GOST01, EVP_R_DECODE_ERROR);
 			ASN1_STRING_free(s);
 			return 0;
 		}
-		for (i = 0; i < 32; i++) {
-			rev_buf[31 - i] = s->data[i];
-		}
+		pk_num = GOST_le2bn(s->data, s->length, NULL);
 		ASN1_STRING_free(s);
-		pk_num = BN_bin2bn(rev_buf, 32, NULL);
 	} else {
 		priv_key = d2i_ASN1_INTEGER(NULL, &p, priv_len);
 		if (priv_key == NULL)
 			return 0;
-		ret = ((pk_num = ASN1_INTEGER_to_BN(priv_key, NULL)) != NULL);
+		pk_num = ASN1_INTEGER_to_BN(priv_key, NULL);
 		ASN1_INTEGER_free(priv_key);
-		if (ret == 0) {
-			GOSTerr(GOST_F_PRIV_DECODE_GOST01, EVP_R_DECODE_ERROR);
-			return 0;
-		}
+	}
+	if (pk_num == NULL) {
+		GOSTerr(GOST_F_PRIV_DECODE_GOST01, EVP_R_DECODE_ERROR);
+		return 0;
 	}
 
 	ec = pk->pkey.gost;
