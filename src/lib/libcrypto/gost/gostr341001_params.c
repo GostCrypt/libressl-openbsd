@@ -98,8 +98,8 @@ static const GostR3410_params GostR3410_256_params[] = {
 };
 
 static const GostR3410_params GostR3410_512_params[] = {
-	{ "A",  NID_id_tc26_gost_3410_2012_512_paramSetA },
-	{ "B",  NID_id_tc26_gost_3410_2012_512_paramSetB },
+	{ "A",  NID_id_tc26_gost_3410_12_512_paramSetA },
+	{ "B",  NID_id_tc26_gost_3410_12_512_paramSetB },
 	{ NULL, NID_undef },
 };
 
