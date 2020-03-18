@@ -190,7 +190,7 @@ static const ASN1_TEMPLATE GOST_KEY_PARAMS_seq_tt[] = {
 		.item = &ASN1_OBJECT_it,
 	},
 	{
-		.flags = 0,
+		.flags = ASN1_TFLG_OPTIONAL,
 		.tag = 0,
 		.offset = offsetof(GOST_KEY_PARAMS, hash_params),
 		.field_name = "hash_params",

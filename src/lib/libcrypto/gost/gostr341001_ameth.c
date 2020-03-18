@@ -90,8 +90,32 @@ decode_gost01_algor_params(EVP_PKEY *pkey, const unsigned char **p, int len)
 		return 0;
 	}
 	param_nid = OBJ_obj2nid(gkp->key_params);
-	digest_nid = OBJ_obj2nid(gkp->hash_params);
+	if (gkp->hash_params)
+		digest_nid = OBJ_obj2nid(gkp->hash_params);
+	else {
+		switch (param_nid) {
+			case NID_id_tc26_gost_3410_12_256_paramSetA:
+			case NID_id_tc26_gost_3410_12_256_paramSetB:
+			case NID_id_tc26_gost_3410_12_256_paramSetC:
+			case NID_id_tc26_gost_3410_12_256_paramSetD:
+				digest_nid = NID_id_tc26_gost3411_2012_256;
+				break;
+			case NID_id_tc26_gost_3410_12_512_paramSetTest:
+			case NID_id_tc26_gost_3410_12_512_paramSetA:
+			case NID_id_tc26_gost_3410_12_512_paramSetB:
+			case NID_id_tc26_gost_3410_12_512_paramSetC:
+				digest_nid = NID_id_tc26_gost3411_2012_512;
+				break;
+			default:
+				digest_nid = NID_undef;
+		}
+	}
 	GOST_KEY_PARAMS_free(gkp);
+
+	if (digest_nid == NID_undef) {
+		GOSTerror(GOST_R_BAD_PKEY_PARAMETERS_FORMAT);
+		return 0;
+	}
 
 	ec = pkey->pkey.gost;
 	if (ec == NULL) {
@@ -137,7 +161,21 @@ encode_gost01_algor_params(const EVP_PKEY *key)
 	pkey_param_nid =
 	    EC_GROUP_get_curve_name(GOST_KEY_get0_group(key->pkey.gost));
 	gkp->key_params = OBJ_nid2obj(pkey_param_nid);
-	gkp->hash_params = OBJ_nid2obj(GOST_KEY_get_digest(key->pkey.gost));
+	switch (pkey_param_nid) {
+	case NID_id_GostR3410_2001_TestParamSet:
+	case NID_id_GostR3410_2001_CryptoPro_A_ParamSet:
+	case NID_id_GostR3410_2001_CryptoPro_B_ParamSet:
+	case NID_id_GostR3410_2001_CryptoPro_C_ParamSet:
+	case NID_id_GostR3410_2001_CryptoPro_XchA_ParamSet:
+	case NID_id_GostR3410_2001_CryptoPro_XchB_ParamSet:
+	case NID_id_tc26_gost_3410_12_512_paramSetA:
+	case NID_id_tc26_gost_3410_12_512_paramSetB:
+		gkp->hash_params = OBJ_nid2obj(GOST_KEY_get_digest(key->pkey.gost));
+		break;
+	default:
+		gkp->hash_params = NULL;
+		break;
+	}
 	/*gkp->cipher_params = OBJ_nid2obj(cipher_param_nid); */
 	params->length = i2d_GOST_KEY_PARAMS(gkp, &params->data);
 	if (params->length <= 0) {
