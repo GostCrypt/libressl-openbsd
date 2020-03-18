@@ -547,7 +547,7 @@ param_decode_gost01(EVP_PKEY *pkey, const unsigned char **pder, int derlen)
 	}
 	group = EC_GROUP_new_by_curve_name(nid);
 	if (group == NULL) {
-		GOSTerror(EC_R_EC_GROUP_NEW_BY_NAME_FAILURE);
+		ECerror(EC_R_EC_GROUP_NEW_BY_NAME_FAILURE);
 		GOST_KEY_free(ec);
 		return 0;
 	}

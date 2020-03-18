@@ -121,7 +121,7 @@ GOST_KEY_check_key(const GOST_KEY *key)
 		return 0;
 	}
 	if (EC_POINT_is_at_infinity(key->group, key->pub_key) != 0) {
-		GOSTerror(EC_R_POINT_AT_INFINITY);
+		ECerror(EC_R_POINT_AT_INFINITY);
 		goto err;
 	}
 	if ((ctx = BN_CTX_new()) == NULL)
@@ -131,14 +131,14 @@ GOST_KEY_check_key(const GOST_KEY *key)
 
 	/* testing whether the pub_key is on the elliptic curve */
 	if (EC_POINT_is_on_curve(key->group, key->pub_key, ctx) == 0) {
-		GOSTerror(EC_R_POINT_IS_NOT_ON_CURVE);
+		ECerror(EC_R_POINT_IS_NOT_ON_CURVE);
 		goto err;
 	}
 	/* testing whether pub_key * order is the point at infinity */
 	if ((order = BN_new()) == NULL)
 		goto err;
 	if (EC_GROUP_get_order(key->group, order, ctx) == 0) {
-		GOSTerror(EC_R_INVALID_GROUP_ORDER);
+		ECerror(EC_R_INVALID_GROUP_ORDER);
 		goto err;
 	}
 	if (EC_POINT_mul(key->group, point, NULL, key->pub_key, order,
@@ -147,7 +147,7 @@ GOST_KEY_check_key(const GOST_KEY *key)
 		goto err;
 	}
 	if (EC_POINT_is_at_infinity(key->group, point) == 0) {
-		GOSTerror(EC_R_WRONG_ORDER);
+		ECerror(EC_R_WRONG_ORDER);
 		goto err;
 	}
 	/*
@@ -156,7 +156,7 @@ GOST_KEY_check_key(const GOST_KEY *key)
 	 */
 	if (key->priv_key != NULL) {
 		if (BN_cmp(key->priv_key, order) >= 0) {
-			GOSTerror(EC_R_WRONG_ORDER);
+			ECerror(EC_R_WRONG_ORDER);
 			goto err;
 		}
 		if (EC_POINT_mul(key->group, point, key->priv_key, NULL, NULL,
@@ -165,7 +165,7 @@ GOST_KEY_check_key(const GOST_KEY *key)
 			goto err;
 		}
 		if (EC_POINT_cmp(key->group, point, key->pub_key, ctx) != 0) {
-			GOSTerror(EC_R_INVALID_PRIVATE_KEY);
+			ECerror(EC_R_INVALID_PRIVATE_KEY);
 			goto err;
 		}
 	}
@@ -212,7 +212,7 @@ GOST_KEY_set_public_key_affine_coordinates(GOST_KEY *key, BIGNUM *x, BIGNUM *y)
 	 * out of range.
 	 */
 	if (BN_cmp(x, tx) != 0 || BN_cmp(y, ty) != 0) {
-		GOSTerror(EC_R_COORDINATES_OUT_OF_RANGE);
+		ECerror(EC_R_COORDINATES_OUT_OF_RANGE);
 		goto err;
 	}
 	if (GOST_KEY_set_public_key(key, point) == 0)

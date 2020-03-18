@@ -246,7 +246,7 @@ pkey_gost01_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen,
 		*siglen = 2 * size;
 		return 1;
 	} else if (*siglen < 2 * size) {
-		GOSTerror(EC_R_BUFFER_TOO_SMALL);
+		ECerror(EC_R_BUFFER_TOO_SMALL);
 		return 0;
 	}
 	if (tbs_len != 32 && tbs_len != 64) {
