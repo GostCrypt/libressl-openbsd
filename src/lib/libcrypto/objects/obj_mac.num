@@ -1007,3 +1007,12 @@ id_tc26_cipher_gostr3412_2015_magma_ctracpkm		1006
 id_tc26_cipher_gostr3412_2015_magma_ctracpkm_omac	1007
 id_tc26_cipher_gostr3412_2015_magma_mgm			1008
 magma_mac			1009
+kuznyechik_ecb			1010
+kuznyechik_cbc			1011
+kuznyechik_cfb128			1012
+kuznyechik_ofb128			1013
+kuznyechik_ctr			1014
+id_tc26_cipher_gostr3412_2015_kuznyechik_ctracpkm		1015
+id_tc26_cipher_gostr3412_2015_kuznyechik_ctracpkm_omac	1016
+id_tc26_cipher_gostr3412_2015_kuznyechik_mgm			1017
+kuznyechik_mac			1018
