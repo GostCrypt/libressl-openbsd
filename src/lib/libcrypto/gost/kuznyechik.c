@@ -234,4 +234,17 @@ Kuznyechik_decrypt(const unsigned char *src, unsigned char *dst,
 	Sinv(dst, temp);
 	memxor(dst, ctx->key + 16 * 0);
 }
+
+void
+Kuznyechik_acpkm_encrypt(const unsigned char *in,
+		unsigned char *out,
+		KUZNYECHIK_KEY *key)
+{
+	if (key->key_meshing && key->count == key->key_meshing) {
+		acpkm_key_mesh(key, (acpkm_block *)Kuznyechik_encrypt, (acpkm_set_key *)Kuznyechik_set_enc_key, 16, 32);
+		key->count = 0;
+	}
+	Kuznyechik_encrypt(in, out, key);
+	key->count += 16;
+}
 #endif

@@ -1728,6 +1728,7 @@ EVP_idea_ofb
 EVP_kuznyechik_cbc
 EVP_kuznyechik_cfb64
 EVP_kuznyechik_ctr
+EVP_kuznyechik_ctr_acpkm
 EVP_kuznyechik_ecb
 EVP_kuznyechik_ofb
 EVP_magma_cbc

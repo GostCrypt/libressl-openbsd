@@ -859,6 +859,7 @@ const EVP_CIPHER *EVP_kuznyechik_cbc(void);
 const EVP_CIPHER *EVP_kuznyechik_cfb128(void);
 const EVP_CIPHER *EVP_kuznyechik_ofb(void);
 const EVP_CIPHER *EVP_kuznyechik_ctr(void);
+const EVP_CIPHER *EVP_kuznyechik_ctr_acpkm(void);
 #endif
 
 #ifndef OPENSSL_NO_SM4

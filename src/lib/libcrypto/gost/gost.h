@@ -111,6 +111,8 @@ void Kuznyechik_encrypt(const unsigned char *in, unsigned char *out,
 	const KUZNYECHIK_KEY *key);
 void Kuznyechik_decrypt(const unsigned char *in, unsigned char *out,
 	const KUZNYECHIK_KEY *key);
+void Kuznyechik_acpkm_encrypt(const unsigned char *in, unsigned char *out,
+	KUZNYECHIK_KEY *key);
 
 typedef struct {
 	ASN1_OCTET_STRING *iv;
