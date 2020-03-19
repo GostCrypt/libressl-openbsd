@@ -1733,6 +1733,7 @@ EVP_kuznyechik_ofb
 EVP_magma_cbc
 EVP_magma_cfb64
 EVP_magma_ctr
+EVP_magma_ctr_acpkm
 EVP_magma_ecb
 EVP_magma_ofb
 EVP_md4
