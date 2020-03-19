@@ -139,6 +139,32 @@ typedef struct xts128_context XTS128_CONTEXT;
 int CRYPTO_xts128_encrypt(const XTS128_CONTEXT *ctx, const unsigned char iv[16],
 	const unsigned char *inp, unsigned char *out, size_t len, int enc);
 
+typedef void (*block64_f)(const unsigned char in[8],
+			unsigned char out[8],
+			const void *key);
+
+void CRYPTO_cbc64_encrypt(const unsigned char *in, unsigned char *out,
+			size_t len, const void *key,
+			unsigned char ivec[8], block64_f block);
+void CRYPTO_cbc64_decrypt(const unsigned char *in, unsigned char *out,
+			size_t len, const void *key,
+			unsigned char ivec[8], block64_f block);
+
+void CRYPTO_ctr64_encrypt(const unsigned char *in, unsigned char *out,
+			size_t len, const void *key,
+			unsigned char ivec[8], unsigned char ecount_buf[8],
+			unsigned int *num, block64_f block);
+
+void CRYPTO_ofb64_encrypt(const unsigned char *in, unsigned char *out,
+			size_t len, const void *key,
+			unsigned char ivec[8], int *num,
+			block64_f block);
+
+void CRYPTO_cfb64_encrypt(const unsigned char *in, unsigned char *out,
+			size_t len, const void *key,
+			unsigned char ivec[8], int *num,
+			int enc, block64_f block);
+
 #ifdef __cplusplus
 }
 #endif
