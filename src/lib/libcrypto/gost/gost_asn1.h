@@ -57,6 +57,17 @@
 __BEGIN_HIDDEN_DECLS
 
 typedef struct {
+	ASN1_OCTET_STRING *masked_priv_key;
+	ASN1_OCTET_STRING *public_key;
+} MASKED_GOST_KEY;
+
+MASKED_GOST_KEY *MASKED_GOST_KEY_new(void);
+void MASKED_GOST_KEY_free(MASKED_GOST_KEY *a);
+MASKED_GOST_KEY *d2i_MASKED_GOST_KEY(MASKED_GOST_KEY **a, const unsigned char **in, long len);
+int i2d_MASKED_GOST_KEY(MASKED_GOST_KEY *a, unsigned char **out);
+extern const ASN1_ITEM MASKED_GOST_KEY_it;
+
+typedef struct {
 	ASN1_OCTET_STRING *encrypted_key;
 	ASN1_OCTET_STRING *imit;
 } GOST_KEY_INFO;
