@@ -83,11 +83,22 @@ typedef struct {
 			 *((c)++)=(unsigned char)(((l)>>24)&0xff))
 #endif
 
+#define be_c2l(c,l)	(l =(((unsigned long)(*((c)++)))<<24),		\
+			 l|=(((unsigned long)(*((c)++)))<<16),		\
+			 l|=(((unsigned long)(*((c)++)))<< 8),		\
+			 l|=(((unsigned long)(*((c)++)))    ))
+#define be_l2c(l,c)	(*((c)++)=(unsigned char)(((l)>>24)&0xff),	\
+			 *((c)++)=(unsigned char)(((l)>>16)&0xff),	\
+			 *((c)++)=(unsigned char)(((l)>> 8)&0xff),	\
+			 *((c)++)=(unsigned char)(((l)    )&0xff))
+
 extern void Gost2814789_encrypt(const unsigned char *in, unsigned char *out,
 	const GOST2814789_KEY *key);
 extern void Gost2814789_decrypt(const unsigned char *in, unsigned char *out,
 	const GOST2814789_KEY *key);
 extern void Gost2814789_cryptopro_key_mesh(GOST2814789_KEY *key);
+
+void Magma_set_key_int(MAGMA_KEY *key, const unsigned char *userKey);
 
 /* GOST 28147-89 key wrapping */
 extern int gost_key_unwrap_crypto_pro(int nid,

@@ -83,6 +83,35 @@ void Gost2814789_cnt_encrypt(const unsigned char *in, unsigned char *out,
 	size_t length, GOST2814789_KEY *key,
 	unsigned char *ivec, unsigned char *cnt_buf, int *num);
 
+#define MAGMA_KEY GOST2814789_KEY
+
+void Magma_set_key(MAGMA_KEY *key, const unsigned char *userKey);
+
+void Magma_encrypt(const unsigned char *in, unsigned char *out,
+	const MAGMA_KEY *key);
+void Magma_decrypt(const unsigned char *in, unsigned char *out,
+	const MAGMA_KEY *key);
+
+#define KUZNYECHIK_KEY_SIZE 32
+#define KUZNYECHIK_SUBKEYS_SIZE (16 * 10)
+#define KUZNYECHIK_BLOCK_SIZE 16
+
+typedef struct kuznyechik_key_st
+{
+	unsigned char key[KUZNYECHIK_SUBKEYS_SIZE];
+	unsigned int count;
+	unsigned int key_meshing;
+} KUZNYECHIK_KEY;
+
+void Kuznyechik_set_key(KUZNYECHIK_KEY *key, const unsigned char *userKey, int enc);
+
+void Kuznyechik_encrypt(const unsigned char *in, unsigned char *out,
+	const KUZNYECHIK_KEY *key);
+void Kuznyechik_decrypt(const unsigned char *in, unsigned char *out,
+	const KUZNYECHIK_KEY *key);
+void Kuznyechik_acpkm_encrypt(const unsigned char *in, unsigned char *out,
+	KUZNYECHIK_KEY *key);
+
 typedef struct {
 	ASN1_OCTET_STRING *iv;
 	ASN1_OBJECT *enc_param_set;

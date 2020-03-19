@@ -998,3 +998,12 @@ id_tc26_gost_3410_12_512_paramSetTest		997
 id_tc26_gost_3410_12_512_paramSetC		998
 id_tc26_hmac_gost_3411_12_256	999
 id_tc26_hmac_gost_3411_12_512	1000
+magma_ecb			1001
+magma_cbc			1002
+magma_cfb64			1003
+magma_ofb64			1004
+magma_ctr			1005
+id_tc26_cipher_gostr3412_2015_magma_ctracpkm		1006
+id_tc26_cipher_gostr3412_2015_magma_ctracpkm_omac	1007
+id_tc26_cipher_gostr3412_2015_magma_mgm			1008
+magma_mac			1009

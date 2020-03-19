@@ -229,6 +229,11 @@ OpenSSL_add_all_ciphers_internal(void)
 	EVP_add_cipher(EVP_gost2814789_ecb());
 	EVP_add_cipher(EVP_gost2814789_cfb64());
 	EVP_add_cipher(EVP_gost2814789_cnt());
+	EVP_add_cipher(EVP_magma_ecb());
+	EVP_add_cipher(EVP_magma_cbc());
+	EVP_add_cipher(EVP_magma_cfb64());
+	EVP_add_cipher(EVP_magma_ofb());
+	EVP_add_cipher(EVP_magma_ctr());
 #endif
 
 #ifndef OPENSSL_NO_SM4
