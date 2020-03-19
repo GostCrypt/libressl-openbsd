@@ -437,6 +437,70 @@ priv_print_gost01(BIO *out, const EVP_PKEY *pkey, int indent, ASN1_PCTX *pctx)
 	return pub_print_gost01(out, pkey, indent, pctx);
 }
 
+static BIGNUM *unmask_priv_key(EVP_PKEY *pk,
+		const unsigned char *buf, int len, int num_masks)
+{
+	BIGNUM *pknum_masked = NULL, *q, *mask;
+	const GOST_KEY *key_ptr = pk->pkey.gost;
+	const EC_GROUP *group = GOST_KEY_get0_group(key_ptr);
+	const unsigned char *p = buf + num_masks * len;
+	BN_CTX *ctx;
+
+	pknum_masked = GOST_le2bn(buf, len, NULL);
+	if (!pknum_masked) {
+		GOSTerror(ERR_R_MALLOC_FAILURE);
+		return NULL;
+	}
+
+	if (num_masks == 0)
+		return pknum_masked;
+
+	ctx = BN_CTX_new();
+	if (ctx == NULL) {
+		GOSTerror(ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
+
+	BN_CTX_start(ctx);
+
+	q = BN_CTX_get(ctx);
+	if (!q) {
+		GOSTerror(ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
+
+	mask = BN_CTX_get(ctx);
+	if (!mask) {
+		GOSTerror(ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
+
+	if (EC_GROUP_get_order(group, q, NULL) <= 0) {
+		GOSTerror(ERR_R_EC_LIB);
+		goto err;
+	}
+
+	for (; p != buf; p -= len) {
+		if (GOST_le2bn(p, len, mask) == NULL ||
+		    !BN_mod_mul(pknum_masked, pknum_masked, mask, q, ctx)) {
+			GOSTerror(ERR_R_BN_LIB);
+			goto err;
+		}
+	}
+
+	BN_CTX_end(ctx);
+	BN_CTX_free(ctx);
+
+	return pknum_masked;
+
+err:
+	BN_CTX_end(ctx);
+	BN_CTX_free(ctx);
+
+	BN_free(pknum_masked);
+	return NULL;
+}
+
 static int
 priv_decode_gost01(EVP_PKEY *pk, const PKCS8_PRIV_KEY_INFO *p8inf)
 {
@@ -450,6 +514,7 @@ priv_decode_gost01(EVP_PKEY *pk, const PKCS8_PRIV_KEY_INFO *p8inf)
 	GOST_KEY *ec;
 	int ptype = V_ASN1_UNDEF;
 	ASN1_STRING *pval = NULL;
+	int expected_key_len;
 
 	if (PKCS8_pkey_get0(&palg_obj, &pkey_buf, &priv_len, &palg, p8inf) == 0) {
 		GOSTerror(GOST_R_BAD_KEY_PARAMETERS_FORMAT);
@@ -467,29 +532,61 @@ priv_decode_gost01(EVP_PKEY *pk, const PKCS8_PRIV_KEY_INFO *p8inf)
 		return 0;
 	}
 	p = pkey_buf;
-	if (V_ASN1_OCTET_STRING == *p) {
+
+	expected_key_len = (pkey_bits_gost01(pk) + 7) / 8;
+	if (expected_key_len == 0) {
+		EVPerror(EVP_R_DECODE_ERROR);
+		return 0;
+	} else if (priv_len % expected_key_len == 0) {
+		/* Key is not wrapped but masked */
+		pk_num = unmask_priv_key(pk, pkey_buf, expected_key_len,
+				priv_len / expected_key_len - 1);
+	} else if (V_ASN1_OCTET_STRING == *p) {
 		/* New format - Little endian octet string */
 		ASN1_OCTET_STRING *s =
 		    d2i_ASN1_OCTET_STRING(NULL, &p, priv_len);
 
 		if (s == NULL) {
-			GOSTerror(EVP_R_DECODE_ERROR);
+			EVPerror(EVP_R_DECODE_ERROR);
 			ASN1_STRING_free(s);
 			return 0;
 		}
 
 		pk_num = GOST_le2bn(s->data, s->length, NULL);
 		ASN1_STRING_free(s);
-	} else {
-		priv_key = d2i_ASN1_INTEGER(NULL, &p, priv_len);
-		if (priv_key == NULL)
-			return 0;
-		ret = ((pk_num = ASN1_INTEGER_to_BN(priv_key, NULL)) != NULL);
-		ASN1_INTEGER_free(priv_key);
-		if (ret == 0) {
-			GOSTerror(EVP_R_DECODE_ERROR);
+	} else if ((V_ASN1_SEQUENCE | V_ASN1_CONSTRUCTED) == *p) {
+		/* New format - Structure with masked private and separate public key */
+		MASKED_GOST_KEY *s =
+		    d2i_MASKED_GOST_KEY(NULL, &p, priv_len);
+
+		if (s == NULL ||
+		    !s->masked_priv_key ||
+		    s->masked_priv_key->length % expected_key_len != 0) {
+			EVPerror(EVP_R_DECODE_ERROR);
+			MASKED_GOST_KEY_free(s);
 			return 0;
 		}
+
+		pk_num = unmask_priv_key(pk, s->masked_priv_key->data,
+					 expected_key_len,
+					 s->masked_priv_key->length / expected_key_len - 1);
+		MASKED_GOST_KEY_free(s);
+	} else if (V_ASN1_INTEGER == *p) {
+		priv_key = d2i_ASN1_INTEGER(NULL, &p, priv_len);
+		if (priv_key == NULL) {
+			EVPerror(EVP_R_DECODE_ERROR);
+			return 0;
+		}
+		pk_num = ASN1_INTEGER_to_BN(priv_key, NULL);
+		ASN1_INTEGER_free(priv_key);
+	} else {
+		EVPerror(EVP_R_DECODE_ERROR);
+		return 0;
+	}
+
+	if (pk_num == NULL) {
+		EVPerror(EVP_R_DECODE_ERROR);
+		return 0;
 	}
 
 	ec = pk->pkey.gost;

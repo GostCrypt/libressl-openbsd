@@ -17,6 +17,58 @@
 #include "gost_locl.h"
 #include "gost_asn1.h"
 
+static const ASN1_TEMPLATE MASKED_GOST_KEY_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(MASKED_GOST_KEY, masked_priv_key),
+		.field_name = "masked_priv_key",
+		.item = &ASN1_OCTET_STRING_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(MASKED_GOST_KEY, public_key),
+		.field_name = "public_key",
+		.item = &ASN1_OCTET_STRING_it,
+	},
+};
+
+const ASN1_ITEM MASKED_GOST_KEY_it = {
+	.itype = ASN1_ITYPE_NDEF_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = MASKED_GOST_KEY_seq_tt,
+	.tcount = sizeof(MASKED_GOST_KEY_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(MASKED_GOST_KEY),
+	.sname = "MASKED_GOST_KEY",
+};
+
+MASKED_GOST_KEY *
+d2i_MASKED_GOST_KEY(MASKED_GOST_KEY **a, const unsigned char **in, long len)
+{
+	return (MASKED_GOST_KEY *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
+	    &MASKED_GOST_KEY_it);
+}
+
+int
+i2d_MASKED_GOST_KEY(MASKED_GOST_KEY *a, unsigned char **out)
+{
+	return ASN1_item_i2d((ASN1_VALUE *)a, out, &MASKED_GOST_KEY_it);
+}
+
+MASKED_GOST_KEY *
+MASKED_GOST_KEY_new(void)
+{
+	return (MASKED_GOST_KEY *)ASN1_item_new(&MASKED_GOST_KEY_it);
+}
+
+void
+MASKED_GOST_KEY_free(MASKED_GOST_KEY *a)
+{
+	ASN1_item_free((ASN1_VALUE *)a, &MASKED_GOST_KEY_it);
+}
+
 static const ASN1_TEMPLATE GOST_KEY_TRANSPORT_seq_tt[] = {
 	{
 		.flags = 0,
