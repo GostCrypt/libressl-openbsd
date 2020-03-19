@@ -1,7 +1,10 @@
 /* $OpenBSD: gost2814789.c,v 1.5 2015/09/10 15:56:25 jsing Exp $ */
 /*
+ * Copyright (c) 2020 Dmitry Baryshkov <dbaryshkov@gmail.com>
  * Copyright (c) 2014 Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
  * Copyright (c) 2005-2006 Cryptocom LTD
+ *
+ * Magma support sponsored by ROSA Linux
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -132,6 +135,74 @@ Gost2814789_decrypt(const unsigned char *in, unsigned char *out,
 
 	l2c(n2, out);
 	l2c(n1, out);
+}
+
+void
+Magma_encrypt(const unsigned char *in, unsigned char *out,
+    const MAGMA_KEY *key)
+{
+	unsigned int n1, n2; /* As named in the GOST */
+
+	be_c2l(in, n2);
+	be_c2l(in, n1);
+
+	/* Instead of swapping halves, swap names each round */
+	n2 ^= f(key, n1 + key->key[0]); n1 ^= f(key, n2 + key->key[1]);
+	n2 ^= f(key, n1 + key->key[2]); n1 ^= f(key, n2 + key->key[3]);
+	n2 ^= f(key, n1 + key->key[4]); n1 ^= f(key, n2 + key->key[5]);
+	n2 ^= f(key, n1 + key->key[6]); n1 ^= f(key, n2 + key->key[7]);
+
+	n2 ^= f(key, n1 + key->key[0]); n1 ^= f(key, n2 + key->key[1]);
+	n2 ^= f(key, n1 + key->key[2]); n1 ^= f(key, n2 + key->key[3]);
+	n2 ^= f(key, n1 + key->key[4]); n1 ^= f(key, n2 + key->key[5]);
+	n2 ^= f(key, n1 + key->key[6]); n1 ^= f(key, n2 + key->key[7]);
+
+	n2 ^= f(key, n1 + key->key[0]); n1 ^= f(key, n2 + key->key[1]);
+	n2 ^= f(key, n1 + key->key[2]); n1 ^= f(key, n2 + key->key[3]);
+	n2 ^= f(key, n1 + key->key[4]); n1 ^= f(key, n2 + key->key[5]);
+	n2 ^= f(key, n1 + key->key[6]); n1 ^= f(key, n2 + key->key[7]);
+
+	n2 ^= f(key, n1 + key->key[7]); n1 ^= f(key, n2 + key->key[6]);
+	n2 ^= f(key, n1 + key->key[5]); n1 ^= f(key, n2 + key->key[4]);
+	n2 ^= f(key, n1 + key->key[3]); n1 ^= f(key, n2 + key->key[2]);
+	n2 ^= f(key, n1 + key->key[1]); n1 ^= f(key, n2 + key->key[0]);
+
+	be_l2c(n1, out);
+	be_l2c(n2, out);
+}
+
+void
+Magma_decrypt(const unsigned char *in, unsigned char *out,
+    const MAGMA_KEY *key)
+{
+	unsigned int n1, n2; /* As named in the GOST */
+
+	be_c2l(in, n2);
+	be_c2l(in, n1);
+
+	/* Instead of swapping halves, swap names each round */
+	n2 ^= f(key, n1 + key->key[0]); n1 ^= f(key, n2 + key->key[1]);
+	n2 ^= f(key, n1 + key->key[2]); n1 ^= f(key, n2 + key->key[3]);
+	n2 ^= f(key, n1 + key->key[4]); n1 ^= f(key, n2 + key->key[5]);
+	n2 ^= f(key, n1 + key->key[6]); n1 ^= f(key, n2 + key->key[7]);
+
+	n2 ^= f(key, n1 + key->key[7]); n1 ^= f(key, n2 + key->key[6]);
+	n2 ^= f(key, n1 + key->key[5]); n1 ^= f(key, n2 + key->key[4]);
+	n2 ^= f(key, n1 + key->key[3]); n1 ^= f(key, n2 + key->key[2]);
+	n2 ^= f(key, n1 + key->key[1]); n1 ^= f(key, n2 + key->key[0]);
+
+	n2 ^= f(key, n1 + key->key[7]); n1 ^= f(key, n2 + key->key[6]);
+	n2 ^= f(key, n1 + key->key[5]); n1 ^= f(key, n2 + key->key[4]);
+	n2 ^= f(key, n1 + key->key[3]); n1 ^= f(key, n2 + key->key[2]);
+	n2 ^= f(key, n1 + key->key[1]); n1 ^= f(key, n2 + key->key[0]);
+
+	n2 ^= f(key, n1 + key->key[7]); n1 ^= f(key, n2 + key->key[6]);
+	n2 ^= f(key, n1 + key->key[5]); n1 ^= f(key, n2 + key->key[4]);
+	n2 ^= f(key, n1 + key->key[3]); n1 ^= f(key, n2 + key->key[2]);
+	n2 ^= f(key, n1 + key->key[1]); n1 ^= f(key, n2 + key->key[0]);
+
+	be_l2c(n1, out);
+	be_l2c(n2, out);
 }
 
 static void

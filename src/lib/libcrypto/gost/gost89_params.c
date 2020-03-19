@@ -224,6 +224,30 @@ Gost2814789_set_key(GOST2814789_KEY *key, const unsigned char *userKey)
 }
 
 void
+Magma_set_key_int(MAGMA_KEY *key, const unsigned char *userKey)
+{
+	int i;
+
+	for (i = 0; i < 8; i++)
+		be_c2l(userKey, key->key[i]);
+
+	key->count = 0;
+}
+
+void
+Magma_set_key(MAGMA_KEY *key, const unsigned char *userKey)
+{
+	unsigned int km = key->key_meshing;
+
+	/* Preserve key meshing setting around setting sbox */
+	Gost2814789_set_sbox(key, NID_id_tc26_gost_28147_param_Z);
+
+	key->key_meshing = km;
+
+	Magma_set_key_int(key, userKey);
+}
+
+void
 Gost2814789_cryptopro_key_mesh(GOST2814789_KEY *key)
 {
 	unsigned char newkey[32];

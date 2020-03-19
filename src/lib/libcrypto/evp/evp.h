@@ -846,6 +846,11 @@ const EVP_CIPHER *EVP_chacha20(void);
 const EVP_CIPHER *EVP_gost2814789_ecb(void);
 const EVP_CIPHER *EVP_gost2814789_cfb64(void);
 const EVP_CIPHER *EVP_gost2814789_cnt(void);
+const EVP_CIPHER *EVP_magma_ecb(void);
+const EVP_CIPHER *EVP_magma_cbc(void);
+const EVP_CIPHER *EVP_magma_cfb64(void);
+const EVP_CIPHER *EVP_magma_ofb(void);
+const EVP_CIPHER *EVP_magma_ctr(void);
 #endif
 
 #ifndef OPENSSL_NO_SM4
