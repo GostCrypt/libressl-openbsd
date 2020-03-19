@@ -548,7 +548,13 @@ pkey_gost01_encrypt_4490(EVP_PKEY_CTX *pctx, unsigned char *out, size_t *out_len
 	int ret = 0;
 	int key_is_ephemeral;
 	EVP_PKEY *sec_key = EVP_PKEY_CTX_get0_peerkey(pctx);
-	int nid = NID_id_Gost28147_89_CryptoPro_A_ParamSet;
+	int nid;
+
+	if (GOST_KEY_get_digest(pubk->pkey.gost) ==
+			NID_id_GostR3411_94_CryptoProParamSet)
+		nid = NID_id_Gost28147_89_CryptoPro_A_ParamSet;
+	else
+		nid = NID_id_tc26_gost_28147_param_Z;
 
 	if (data->shared_ukm != NULL && data->shared_ukm_len >= 8) {
 		memcpy(ukm, data->shared_ukm, 8);
