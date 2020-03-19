@@ -851,6 +851,11 @@ const EVP_CIPHER *EVP_magma_cbc(void);
 const EVP_CIPHER *EVP_magma_cfb64(void);
 const EVP_CIPHER *EVP_magma_ofb(void);
 const EVP_CIPHER *EVP_magma_ctr(void);
+const EVP_CIPHER *EVP_kuznyechik_ecb(void);
+const EVP_CIPHER *EVP_kuznyechik_cbc(void);
+const EVP_CIPHER *EVP_kuznyechik_cfb128(void);
+const EVP_CIPHER *EVP_kuznyechik_ofb(void);
+const EVP_CIPHER *EVP_kuznyechik_ctr(void);
 #endif
 
 #ifndef OPENSSL_NO_SM4

@@ -1402,6 +1402,20 @@ tc26 1 5 1 2		: magma-ctr-acpkm-omac
 tc26 1 5 1 3		: magma-mgm
 			: magma-mac
 
+#GOST R 34.12-2014, cipher Kuznyechik
+			: kuznyechik-ecb
+			: kuznyechik-cbc
+			: kuznyechik-cfb128
+			: kuznyechik-ofb128
+			: kuznyechik-ctr
+!Cname id-tc26-cipher-gostr3412-2015-kuznyechik-ctracpkm
+tc26 1 5 2 1		: kuznyechik-ctr-acpkm
+!Cname id-tc26-cipher-gostr3412-2015-kuznyechik-ctracpkm-omac
+tc26 1 5 2 2		: kuznyechik-ctr-acpkm-omac
+!Cname id-tc26-cipher-gostr3412-2015-kuznyechik-mgm
+tc26 1 5 2 3		: kuznyechik-mgm
+			: kuznyechik-mac
+
 # Curves from draft-ietf-curdle-pkix-02
 1 3 101 110		: X25519
 1 3 101 111		: X448
