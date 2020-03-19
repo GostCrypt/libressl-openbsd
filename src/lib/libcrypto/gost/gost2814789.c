@@ -205,6 +205,19 @@ Magma_decrypt(const unsigned char *in, unsigned char *out,
 	be_l2c(n2, out);
 }
 
+void
+Magma_acpkm_encrypt(const unsigned char *in,
+		unsigned char *out,
+		MAGMA_KEY *key)
+{
+	if (key->key_meshing && key->count == key->key_meshing) {
+		acpkm_key_mesh(key, (acpkm_block *)Magma_encrypt, (acpkm_set_key *)Magma_set_key_int, 8, 32);
+		key->count = 0;
+	}
+	Magma_encrypt(in, out, key);
+	key->count += 8;
+}
+
 static void
 Gost2814789_mac(const unsigned char *in, unsigned char *mac,
     GOST2814789_KEY *key)

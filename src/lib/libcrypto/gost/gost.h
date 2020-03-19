@@ -91,6 +91,8 @@ void Magma_encrypt(const unsigned char *in, unsigned char *out,
 	const MAGMA_KEY *key);
 void Magma_decrypt(const unsigned char *in, unsigned char *out,
 	const MAGMA_KEY *key);
+void Magma_acpkm_encrypt(const unsigned char *in, unsigned char *out,
+	MAGMA_KEY *key);
 
 #define KUZNYECHIK_KEY_SIZE 32
 #define KUZNYECHIK_SUBKEYS_SIZE (16 * 10)
