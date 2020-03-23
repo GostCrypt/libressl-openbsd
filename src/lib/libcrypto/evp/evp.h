@@ -396,6 +396,8 @@ struct evp_cipher_st {
 #define		EVP_CTRL_GCM_SET_IV_INV		0x18
 /* Set the S-BOX NID for GOST ciphers */
 #define		EVP_CTRL_GOST_SET_SBOX		0x19
+/* Set the key meshing section for GOST ciphers */
+#define		EVP_CTRL_GOST_SET_MESHING	0x1a
 
 /* GCM TLS constants */
 /* Length of fixed part of IV derived from PRF */
