@@ -82,7 +82,8 @@ gost2814789_md_ctrl(EVP_MD_CTX *ctx, int cmd, int p1, void *p2)
 
 	switch (cmd) {
 	case EVP_MD_CTRL_SET_KEY:
-		return Gost2814789_set_key(&gctx->cipher, p2, p1);
+		Gost2814789_set_key(&gctx->cipher, p2);
+		return 1;
 	case EVP_MD_CTRL_GOST_SET_SBOX:
 		return Gost2814789_set_sbox(&gctx->cipher, p1);
 	}
