@@ -97,6 +97,11 @@ extern void Gost2814789_encrypt(const unsigned char *in, unsigned char *out,
 extern void Gost2814789_decrypt(const unsigned char *in, unsigned char *out,
 	const GOST2814789_KEY *key);
 extern void Gost2814789_cryptopro_key_mesh(GOST2814789_KEY *key);
+typedef void acpkm_block(const unsigned char *in, unsigned char *out, void *ctx);
+typedef void acpkm_set_key(void *ctx, const unsigned char *key);
+extern void acpkm_key_mesh(void *ctx,
+		acpkm_block *block, acpkm_set_key *set_key,
+		unsigned int block_size, unsigned int key_size);
 
 void Magma_set_key_int(MAGMA_KEY *key, const unsigned char *userKey);
 
