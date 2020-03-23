@@ -139,7 +139,7 @@ hash_step(GOSTR341194_CTX *c, unsigned char *H, const unsigned char *M)
 	xor_blocks(W, H, M, 32);
 	swap_bytes(W, Key);
 	/* Encrypt first 8 bytes of H with first key */
-	Gost2814789_set_key(&c->cipher, Key, 256);
+	Gost2814789_set_key(&c->cipher, Key);
 	Gost2814789_encrypt(H, S, &c->cipher);
 
 	/* Compute second key */
@@ -149,7 +149,7 @@ hash_step(GOSTR341194_CTX *c, unsigned char *H, const unsigned char *M)
 	xor_blocks(W, U, V, 32);
 	swap_bytes(W, Key);
 	/* encrypt second 8 bytes of H with second key */
-	Gost2814789_set_key(&c->cipher, Key, 256);
+	Gost2814789_set_key(&c->cipher, Key);
 	Gost2814789_encrypt(H+8, S+8, &c->cipher);
 
 	/* compute third key */
@@ -175,7 +175,7 @@ hash_step(GOSTR341194_CTX *c, unsigned char *H, const unsigned char *M)
 	xor_blocks(W, U, V, 32);
 	swap_bytes(W, Key);
 	/* encrypt third 8 bytes of H with third key */
-	Gost2814789_set_key(&c->cipher, Key, 256);
+	Gost2814789_set_key(&c->cipher, Key);
 	Gost2814789_encrypt(H+16, S+16, &c->cipher);
 
 	/* Compute fourth key */
@@ -185,7 +185,7 @@ hash_step(GOSTR341194_CTX *c, unsigned char *H, const unsigned char *M)
 	xor_blocks(W, U, V, 32);
 	swap_bytes(W, Key);
 	/* Encrypt last 8 bytes with fourth key */
-	Gost2814789_set_key(&c->cipher, Key, 256);
+	Gost2814789_set_key(&c->cipher, Key);
 	Gost2814789_encrypt(H+24, S+24, &c->cipher);
 
 	for (i = 0; i < 12; i++)

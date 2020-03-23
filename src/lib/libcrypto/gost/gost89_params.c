@@ -212,21 +212,15 @@ Gost2814789_set_sbox(GOST2814789_KEY *key, int nid)
 	return 1;
 }
 
-int
-Gost2814789_set_key(GOST2814789_KEY *key, const unsigned char *userKey,
-    const int bits)
+void
+Gost2814789_set_key(GOST2814789_KEY *key, const unsigned char *userKey)
 {
 	int i;
-
-	if (bits != 256)
-		return 0;
 
 	for (i = 0; i < 8; i++)
 		c2l(userKey, key->key[i]);
 
 	key->count = 0;
-
-	return 1;
 }
 
 void
@@ -239,6 +233,6 @@ Gost2814789_cryptopro_key_mesh(GOST2814789_KEY *key)
 	Gost2814789_decrypt(CryptoProKeyMeshingKey + 16, newkey + 16, key);
 	Gost2814789_decrypt(CryptoProKeyMeshingKey + 24, newkey + 24, key);
 
-	Gost2814789_set_key(key, newkey, 256);
+	Gost2814789_set_key(key, newkey);
 }
 #endif

@@ -73,8 +73,7 @@ typedef struct gost2814789_key_st {
 } GOST2814789_KEY;
 
 int Gost2814789_set_sbox(GOST2814789_KEY *key, int nid);
-int Gost2814789_set_key(GOST2814789_KEY *key,
-		const unsigned char *userKey, const int bits);
+void Gost2814789_set_key(GOST2814789_KEY *key, const unsigned char *userKey);
 void Gost2814789_ecb_encrypt(const unsigned char *in, unsigned char *out,
 	GOST2814789_KEY *key, const int enc);
 void Gost2814789_cfb64_encrypt(const unsigned char *in, unsigned char *out,

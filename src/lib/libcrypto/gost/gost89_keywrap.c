@@ -85,7 +85,7 @@ key_diversify_crypto_pro(GOST2814789_KEY *ctx, const unsigned char *inputKey,
 		p = S;
 		l2c (s1, p);
 		l2c (s2, p);
-		Gost2814789_set_key(ctx, outputKey, 256);
+		Gost2814789_set_key(ctx, outputKey);
 		mask = 0;
 		Gost2814789_cfb64_encrypt(outputKey, outputKey, 32, ctx, S,
 		    &mask, 1);
@@ -102,7 +102,7 @@ gost_key_wrap_crypto_pro(int nid, const unsigned char *keyExchangeKey,
 
 	Gost2814789_set_sbox(&ctx, nid);
 	key_diversify_crypto_pro(&ctx, keyExchangeKey, ukm, kek_ukm);
-	Gost2814789_set_key(&ctx, kek_ukm, 256);
+	Gost2814789_set_key(&ctx, kek_ukm);
 	memcpy(wrappedKey, ukm, 8);
 	Gost2814789_encrypt(sessionKey +  0, wrappedKey + 8 +  0, &ctx);
 	Gost2814789_encrypt(sessionKey +  8, wrappedKey + 8 +  8, &ctx);
@@ -122,7 +122,7 @@ gost_key_unwrap_crypto_pro(int nid, const unsigned char *keyExchangeKey,
 	Gost2814789_set_sbox(&ctx, nid);
 	/* First 8 bytes of wrapped Key is ukm */
 	key_diversify_crypto_pro(&ctx, keyExchangeKey, wrappedKey, kek_ukm);
-	Gost2814789_set_key(&ctx, kek_ukm, 256);
+	Gost2814789_set_key(&ctx, kek_ukm);
 	Gost2814789_decrypt(wrappedKey + 8 +  0, sessionKey +  0, &ctx);
 	Gost2814789_decrypt(wrappedKey + 8 +  8, sessionKey +  8, &ctx);
 	Gost2814789_decrypt(wrappedKey + 8 + 16, sessionKey + 16, &ctx);

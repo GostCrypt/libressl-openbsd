@@ -93,7 +93,9 @@ gost2814789_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 {
 	EVP_GOST2814789_CTX *c = ctx->cipher_data;
 
-	return Gost2814789_set_key(&c->ks, key, ctx->key_len * 8);
+	Gost2814789_set_key(&c->ks, key);
+
+	return 1;
 }
 
 int
