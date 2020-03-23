@@ -169,7 +169,7 @@ void
 Gost2814789_ecb_encrypt(const unsigned char *in, unsigned char *out,
     GOST2814789_KEY *key, const int enc)
 {
-	if (key->key_meshing && key->count == 1024) {
+	if (key->key_meshing && key->count == key->key_meshing) {
 		Gost2814789_cryptopro_key_mesh(key);
 		key->count = 0;
 	}
@@ -183,7 +183,7 @@ Gost2814789_ecb_encrypt(const unsigned char *in, unsigned char *out,
 static inline void
 Gost2814789_encrypt_mesh(unsigned char *iv, GOST2814789_KEY *key)
 {
-	if (key->key_meshing && key->count == 1024) {
+	if (key->key_meshing && key->count == key->key_meshing) {
 		Gost2814789_cryptopro_key_mesh(key);
 		Gost2814789_encrypt(iv, iv, key);
 		key->count = 0;
@@ -196,7 +196,7 @@ static inline void
 Gost2814789_mac_mesh(const unsigned char *data, unsigned char *mac,
     GOST2814789_KEY *key)
 {
-	if (key->key_meshing && key->count == 1024) {
+	if (key->key_meshing && key->count == key->key_meshing) {
 		Gost2814789_cryptopro_key_mesh(key);
 		key->count = 0;
 	}
@@ -328,7 +328,7 @@ Gost2814789_cnt_next(unsigned char *ivec, unsigned char *out,
 	if (key->count == 0)
 		Gost2814789_encrypt(ivec, ivec, key);
 
-	if (key->key_meshing && key->count == 1024) {
+	if (key->key_meshing && key->count == key->key_meshing) {
 		Gost2814789_cryptopro_key_mesh(key);
 		Gost2814789_encrypt(ivec, ivec, key);
 		key->count = 0;
