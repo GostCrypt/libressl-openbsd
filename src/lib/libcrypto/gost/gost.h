@@ -69,7 +69,7 @@ typedef struct gost2814789_key_st {
 	unsigned int key[8];
 	unsigned int k87[256],k65[256],k43[256],k21[256];
 	unsigned int count;
-	unsigned key_meshing : 1;
+	unsigned int key_meshing;
 } GOST2814789_KEY;
 
 int Gost2814789_set_sbox(GOST2814789_KEY *key, int nid);

@@ -191,7 +191,7 @@ Gost2814789_set_sbox(GOST2814789_KEY *key, int nid)
 			continue;
 
 		b = gost_cipher_list[i].sblock;
-		key->key_meshing = gost_cipher_list[i].key_meshing;
+		key->key_meshing = gost_cipher_list[i].key_meshing ? 1024 : 0;
 		break;
 	}
 
