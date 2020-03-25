@@ -150,6 +150,12 @@ aead_from_name(const EVP_AEAD **aead, const char *name)
 #else
 		fprintf(stderr, "No kuznyechik-MGM support.\n");
 #endif
+	} else if (strcmp(name, "magma-mgm") == 0) {
+#ifndef OPENSSL_NO_GOST
+		*aead = EVP_aead_magma_mgm();
+#else
+		fprintf(stderr, "No magma-MGM support.\n");
+#endif
 	} else {
 		fprintf(stderr, "Unknown AEAD: %s\n", name);
 		return -1;
