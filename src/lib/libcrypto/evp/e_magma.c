@@ -196,6 +196,14 @@ BLOCK_CIPHER_def1(magma, ctr_acpkm, ctr_acpkm, CTR, EVP_MAGMA_CTX,
 
 #define EVP_AEAD_MAGMA_MGM_TAG_LEN 16
 
+typedef struct {
+	MAGMA_KEY ks;		/* MAGMA key schedule to use */
+	MGM64_CONTEXT mgm;
+	int key_set;		/* Set if key initialised */
+	int iv_set;		/* Set if an iv is set */
+	int tag_len;
+} EVP_MAGMA_MGM_CTX;
+
 struct aead_magma_mgm_ctx {
 	MAGMA_KEY ks;
 	MGM64_CONTEXT mgm;
@@ -209,6 +217,151 @@ magma_mgm_set_key(MAGMA_KEY *magma_key, MGM64_CONTEXT *mgm_ctx,
 	Magma_set_key(magma_key, key);
 	CRYPTO_mgm64_init(mgm_ctx, magma_key, (block64_f)Magma_encrypt);
 }
+
+static int
+magma_mgm_cleanup(EVP_CIPHER_CTX *c)
+{
+	EVP_MAGMA_MGM_CTX *gctx = c->cipher_data;
+
+	explicit_bzero(gctx, sizeof(*gctx));
+	return 1;
+}
+
+static int
+magma_mgm_ctrl(EVP_CIPHER_CTX *c, int type, int arg, void *ptr)
+{
+	EVP_MAGMA_MGM_CTX *gctx = c->cipher_data;
+
+	switch (type) {
+	case EVP_CTRL_INIT:
+		gctx->key_set = 0;
+		gctx->iv_set = 0;
+		gctx->tag_len = -1;
+		return 1;
+
+	case EVP_CTRL_MGM_SET_TAG:
+		if (arg <= 0 || arg > 8 || c->encrypt)
+			return 0;
+		memcpy(c->buf, ptr, arg);
+		gctx->tag_len = arg;
+		return 1;
+
+	case EVP_CTRL_MGM_GET_TAG:
+		if (arg <= 0 || arg > 8 || !c->encrypt || gctx->tag_len < 0)
+			return 0;
+		memcpy(ptr, c->buf, arg);
+		return 1;
+
+	case EVP_CTRL_COPY:
+	    {
+		EVP_CIPHER_CTX *out = ptr;
+		EVP_MAGMA_MGM_CTX *gctx_out = out->cipher_data;
+
+		if (gctx->mgm.key) {
+			if (gctx->mgm.key != &gctx->ks)
+				return 0;
+			gctx_out->mgm.key = &gctx_out->ks;
+		}
+
+		return 1;
+	    }
+
+	default:
+		return -1;
+
+	}
+}
+
+static int
+magma_mgm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
+    const unsigned char *iv, int enc)
+{
+	EVP_MAGMA_MGM_CTX *gctx = ctx->cipher_data;
+
+	if (!iv && !key)
+		return 1;
+	if (key) {
+		magma_mgm_set_key(&gctx->ks, &gctx->mgm, key, ctx->key_len);
+
+		/* If we have an iv can set it directly, otherwise use
+		 * saved IV.
+		 */
+		if (gctx->iv_set)
+			iv = ctx->iv;
+		if (iv) {
+			CRYPTO_mgm64_setiv(&gctx->mgm, iv);
+			gctx->iv_set = 1;
+		}
+		gctx->key_set = 1;
+	} else {
+		/* If key set use IV, otherwise copy */
+		if (gctx->key_set)
+			CRYPTO_mgm64_setiv(&gctx->mgm, iv);
+		else
+			memcpy(ctx->iv, iv, ctx->cipher->iv_len);
+		gctx->iv_set = 1;
+	}
+	return 1;
+}
+
+static int
+magma_mgm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
+    const unsigned char *in, size_t len)
+{
+	EVP_MAGMA_MGM_CTX *gctx = ctx->cipher_data;
+
+	/* If not set up, return error */
+	if (!gctx->key_set)
+		return -1;
+
+	if (!gctx->iv_set)
+		return -1;
+
+	if (in) {
+		if (out == NULL) {
+			if (CRYPTO_mgm64_aad(&gctx->mgm, in, len))
+				return -1;
+		} else if (ctx->encrypt) {
+			if (CRYPTO_mgm64_encrypt(&gctx->mgm, in, out, len))
+				return -1;
+		} else {
+			if (CRYPTO_mgm64_decrypt(&gctx->mgm, in, out, len))
+				return -1;
+		}
+		return len;
+	} else {
+		if (!ctx->encrypt) {
+			if (gctx->tag_len < 0)
+				return -1;
+			if (CRYPTO_mgm64_finish(&gctx->mgm, ctx->buf, gctx->tag_len) != 0)
+				return -1;
+			gctx->iv_set = 0;
+			return 0;
+		}
+		CRYPTO_mgm64_tag(&gctx->mgm, ctx->buf, 8);
+		gctx->tag_len = 8;
+
+		/* Don't reuse the IV */
+		gctx->iv_set = 0;
+		return 0;
+	}
+
+}
+
+#define CUSTOM_FLAGS \
+    ( EVP_CIPH_FLAG_DEFAULT_ASN1 | EVP_CIPH_CUSTOM_IV | \
+      EVP_CIPH_FLAG_CUSTOM_CIPHER | EVP_CIPH_ALWAYS_CALL_INIT | \
+      EVP_CIPH_CTRL_INIT | EVP_CIPH_CUSTOM_COPY )
+
+#define NID_magma_mgm NID_id_tc26_cipher_gostr3412_2015_magma_mgm
+
+BLOCK_CIPHER_def1(magma, mgm, mgm, GCM, EVP_MAGMA_MGM_CTX,
+		NID_magma, 1, 32, 8,
+		EVP_CIPH_FLAG_AEAD_CIPHER|CUSTOM_FLAGS,
+		magma_mgm_init_key, magma_mgm_cleanup,
+		EVP_CIPHER_set_asn1_iv,
+		EVP_CIPHER_get_asn1_iv,
+		magma_mgm_ctrl)
 
 static int
 aead_magma_mgm_init(EVP_AEAD_CTX *ctx, const unsigned char *key, size_t key_len,
