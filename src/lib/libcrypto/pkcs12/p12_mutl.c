@@ -74,6 +74,7 @@ PKCS12_gen_mac(PKCS12 *p12, const char *pass, int passlen,
     unsigned char *mac, unsigned int *maclen)
 {
 	const EVP_MD *md_type;
+	int md_type_nid;
 	HMAC_CTX hmac;
 	unsigned char key[EVP_MAX_MD_SIZE], *salt;
 	int saltlen, iter;
@@ -97,13 +98,26 @@ PKCS12_gen_mac(PKCS12 *p12, const char *pass, int passlen,
 		PKCS12error(PKCS12_R_UNKNOWN_DIGEST_ALGORITHM);
 		return 0;
 	}
-	md_size = EVP_MD_size(md_type);
-	if (md_size < 0)
-		return 0;
-	if (!PKCS12_key_gen(pass, passlen, salt, saltlen, PKCS12_MAC_ID, iter,
-	    md_size, key, md_type)) {
-		PKCS12error(PKCS12_R_KEY_GEN_ERROR);
-		return 0;
+	md_type_nid = EVP_MD_type(md_type);
+	if ((md_type_nid == NID_id_GostR3411_94 ||
+	     md_type_nid == NID_id_tc26_gost3411_2012_256 ||
+	     md_type_nid == NID_id_tc26_gost3411_2012_512) &&
+	    getenv("LEGACY_GOST_PKCS12") == NULL) {
+		md_size = PKCS12_GOST_KEY_LEN;
+		if (!PKCS12_key_gen_gost(pass, passlen, salt, saltlen, iter,
+		    md_size, key, md_type)) {
+			PKCS12error(PKCS12_R_KEY_GEN_ERROR);
+			return 0;
+		}
+	} else {
+		md_size = EVP_MD_size(md_type);
+		if (md_size < 0)
+			return 0;
+		if (!PKCS12_key_gen(pass, passlen, salt, saltlen, PKCS12_MAC_ID, iter,
+		    md_size, key, md_type)) {
+			PKCS12error(PKCS12_R_KEY_GEN_ERROR);
+			return 0;
+		}
 	}
 	HMAC_CTX_init(&hmac);
 	if (!HMAC_Init_ex(&hmac, key, md_size, md_type, NULL) ||

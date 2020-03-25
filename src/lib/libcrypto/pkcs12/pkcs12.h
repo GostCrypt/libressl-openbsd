@@ -91,6 +91,11 @@ extern "C" {
 #define PKCS12_add_friendlyname PKCS12_add_friendlyname_asc
 #endif
 
+#define PKCS12_GOST_KEY_LEN 32
+int PKCS12_key_gen_gost(const char *pass, int passlen, unsigned char *salt,
+    int saltlen, int iter, int n, unsigned char *out,
+    const EVP_MD *md_type);
+
 /* MS key usage constants */
 
 #define KEY_EX	0x10

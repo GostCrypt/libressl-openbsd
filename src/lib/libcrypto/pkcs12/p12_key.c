@@ -195,3 +195,21 @@ end:
 	EVP_MD_CTX_cleanup(&ctx);
 	return ret;
 }
+
+int
+PKCS12_key_gen_gost(const char *pass, int passlen, unsigned char *salt,
+    int saltlen, int iter, int n, unsigned char *out,
+    const EVP_MD *md_type)
+{
+	unsigned char buf[96];
+
+	if (n != PKCS12_GOST_KEY_LEN)
+		return 0;
+
+	if (!PKCS5_PBKDF2_HMAC(pass, passlen, salt, saltlen, iter, md_type, sizeof(buf), buf))
+		return 0;
+
+	memcpy(out, buf + sizeof(buf) - PKCS12_GOST_KEY_LEN, PKCS12_GOST_KEY_LEN);
+
+	return 1;
+}
