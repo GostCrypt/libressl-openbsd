@@ -385,6 +385,8 @@ struct evp_cipher_st {
 #define		EVP_CTRL_CCM_SET_TAG		EVP_CTRL_GCM_SET_TAG
 #define		EVP_CTRL_CCM_SET_L		0x14
 #define		EVP_CTRL_CCM_SET_MSGLEN		0x15
+#define		EVP_CTRL_MGM_GET_TAG		EVP_CTRL_GCM_GET_TAG
+#define		EVP_CTRL_MGM_SET_TAG		EVP_CTRL_GCM_SET_TAG
 /* AEAD cipher deduces payload length and returns number of bytes
  * required to store MAC and eventual padding. Subsequent call to
  * EVP_Cipher even appends/verifies MAC.
@@ -860,6 +862,7 @@ const EVP_CIPHER *EVP_kuznyechik_cfb128(void);
 const EVP_CIPHER *EVP_kuznyechik_ofb(void);
 const EVP_CIPHER *EVP_kuznyechik_ctr(void);
 const EVP_CIPHER *EVP_kuznyechik_ctr_acpkm(void);
+const EVP_CIPHER *EVP_kuznyechik_mgm(void);
 #endif
 
 #ifndef OPENSSL_NO_SM4
