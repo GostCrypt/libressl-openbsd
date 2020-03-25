@@ -181,6 +181,22 @@ void CRYPTO_cfb64_encrypt(const unsigned char *in, unsigned char *out,
 			unsigned char ivec[8], int *num,
 			int enc, block64_f block);
 
+typedef struct mgm64_context MGM64_CONTEXT;
+
+void CRYPTO_mgm64_init(MGM64_CONTEXT *ctx,void *key,block64_f block);
+void CRYPTO_mgm64_setiv(MGM64_CONTEXT *ctx, const unsigned char *iv);
+int CRYPTO_mgm64_aad(MGM64_CONTEXT *ctx, const unsigned char *aad,
+			size_t len);
+int CRYPTO_mgm64_encrypt(MGM64_CONTEXT *ctx,
+			const unsigned char *in, unsigned char *out,
+			size_t len);
+int CRYPTO_mgm64_decrypt(MGM64_CONTEXT *ctx,
+			const unsigned char *in, unsigned char *out,
+			size_t len);
+int CRYPTO_mgm64_finish(MGM64_CONTEXT *ctx,const unsigned char *tag,
+			size_t len);
+void CRYPTO_mgm64_tag(MGM64_CONTEXT *ctx, unsigned char *tag, size_t len);
+
 #ifdef __cplusplus
 }
 #endif
