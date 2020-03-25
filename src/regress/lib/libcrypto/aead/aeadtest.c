@@ -144,6 +144,12 @@ aead_from_name(const EVP_AEAD **aead, const char *name)
 #else
 		fprintf(stderr, "No xchacha20-poly1305 support.\n");
 #endif
+	} else if (strcmp(name, "kuznyechik-mgm") == 0) {
+#ifndef OPENSSL_NO_GOST
+		*aead = EVP_aead_kuznyechik_mgm();
+#else
+		fprintf(stderr, "No kuznyechik-MGM support.\n");
+#endif
 	} else {
 		fprintf(stderr, "Unknown AEAD: %s\n", name);
 		return -1;

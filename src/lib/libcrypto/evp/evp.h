@@ -1289,6 +1289,11 @@ const EVP_AEAD *EVP_aead_chacha20_poly1305(void);
 const EVP_AEAD *EVP_aead_xchacha20_poly1305(void);
 #endif
 
+#if !defined(OPENSSL_NO_GOST)
+/* EVP_aead_kuznyechik_mgm is Kuznyechik in Multilinear Galois Mode. */
+const EVP_AEAD *EVP_aead_kuznyechik_mgm(void);
+#endif
+
 /* EVP_AEAD_key_length returns the length of the keys used. */
 size_t EVP_AEAD_key_length(const EVP_AEAD *aead);
 
