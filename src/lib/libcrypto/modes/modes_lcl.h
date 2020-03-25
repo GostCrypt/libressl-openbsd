@@ -119,4 +119,15 @@ struct mgm128_context {
 
 #define MGM128_NONCE_LEN 16
 
+struct mgm64_context {
+	u32 len[2]; /* aad and data len */
+	u64 sum;
+	u8 y[8], z[8], part[8];
+	block64_f block;
+	void *key;
+	unsigned int a_remain, d_remain;
+};
+
+#define MGM64_NONCE_LEN 8
+
 __END_HIDDEN_DECLS
