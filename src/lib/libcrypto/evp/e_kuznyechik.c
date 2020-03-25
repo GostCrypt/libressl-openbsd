@@ -202,6 +202,14 @@ BLOCK_CIPHER_def1(kuznyechik, ctr_acpkm, ctr_acpkm, CTR, EVP_KUZNYECHIK_CTX,
 
 #define EVP_AEAD_KUZNYECHIK_MGM_TAG_LEN 16
 
+typedef struct {
+	KUZNYECHIK_KEY ks;		/* KUZNYECHIK key schedule to use */
+	MGM128_CONTEXT mgm;
+	int key_set;		/* Set if key initialised */
+	int iv_set;		/* Set if an iv is set */
+	int tag_len;
+} EVP_KUZNYECHIK_MGM_CTX;
+
 struct aead_kuznyechik_mgm_ctx {
 	KUZNYECHIK_KEY ks;
 	MGM128_CONTEXT mgm;
@@ -215,6 +223,151 @@ kuznyechik_mgm_set_key(KUZNYECHIK_KEY *kuznyechik_key, MGM128_CONTEXT *mgm_ctx,
 	Kuznyechik_set_key(kuznyechik_key, key, 1);
 	CRYPTO_mgm128_init(mgm_ctx, kuznyechik_key, (block128_f)Kuznyechik_encrypt);
 }
+
+static int
+kuznyechik_mgm_cleanup(EVP_CIPHER_CTX *c)
+{
+	EVP_KUZNYECHIK_MGM_CTX *gctx = c->cipher_data;
+
+	explicit_bzero(gctx, sizeof(*gctx));
+	return 1;
+}
+
+static int
+kuznyechik_mgm_ctrl(EVP_CIPHER_CTX *c, int type, int arg, void *ptr)
+{
+	EVP_KUZNYECHIK_MGM_CTX *gctx = c->cipher_data;
+
+	switch (type) {
+	case EVP_CTRL_INIT:
+		gctx->key_set = 0;
+		gctx->iv_set = 0;
+		gctx->tag_len = -1;
+		return 1;
+
+	case EVP_CTRL_MGM_SET_TAG:
+		if (arg <= 0 || arg > 16 || c->encrypt)
+			return 0;
+		memcpy(c->buf, ptr, arg);
+		gctx->tag_len = arg;
+		return 1;
+
+	case EVP_CTRL_MGM_GET_TAG:
+		if (arg <= 0 || arg > 16 || !c->encrypt || gctx->tag_len < 0)
+			return 0;
+		memcpy(ptr, c->buf, arg);
+		return 1;
+
+	case EVP_CTRL_COPY:
+	    {
+		EVP_CIPHER_CTX *out = ptr;
+		EVP_KUZNYECHIK_MGM_CTX *gctx_out = out->cipher_data;
+
+		if (gctx->mgm.key) {
+			if (gctx->mgm.key != &gctx->ks)
+				return 0;
+			gctx_out->mgm.key = &gctx_out->ks;
+		}
+
+		return 1;
+	    }
+
+	default:
+		return -1;
+
+	}
+}
+
+static int
+kuznyechik_mgm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
+    const unsigned char *iv, int enc)
+{
+	EVP_KUZNYECHIK_MGM_CTX *gctx = ctx->cipher_data;
+
+	if (!iv && !key)
+		return 1;
+	if (key) {
+		kuznyechik_mgm_set_key(&gctx->ks, &gctx->mgm, key, ctx->key_len);
+
+		/* If we have an iv can set it directly, otherwise use
+		 * saved IV.
+		 */
+		if (gctx->iv_set)
+			iv = ctx->iv;
+		if (iv) {
+			CRYPTO_mgm128_setiv(&gctx->mgm, iv);
+			gctx->iv_set = 1;
+		}
+		gctx->key_set = 1;
+	} else {
+		/* If key set use IV, otherwise copy */
+		if (gctx->key_set)
+			CRYPTO_mgm128_setiv(&gctx->mgm, iv);
+		else
+			memcpy(ctx->iv, iv, ctx->cipher->iv_len);
+		gctx->iv_set = 1;
+	}
+	return 1;
+}
+
+static int
+kuznyechik_mgm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
+    const unsigned char *in, size_t len)
+{
+	EVP_KUZNYECHIK_MGM_CTX *gctx = ctx->cipher_data;
+
+	/* If not set up, return error */
+	if (!gctx->key_set)
+		return -1;
+
+	if (!gctx->iv_set)
+		return -1;
+
+	if (in) {
+		if (out == NULL) {
+			if (CRYPTO_mgm128_aad(&gctx->mgm, in, len))
+				return -1;
+		} else if (ctx->encrypt) {
+			if (CRYPTO_mgm128_encrypt(&gctx->mgm, in, out, len))
+				return -1;
+		} else {
+			if (CRYPTO_mgm128_decrypt(&gctx->mgm, in, out, len))
+				return -1;
+		}
+		return len;
+	} else {
+		if (!ctx->encrypt) {
+			if (gctx->tag_len < 0)
+				return -1;
+			if (CRYPTO_mgm128_finish(&gctx->mgm, ctx->buf, gctx->tag_len) != 0)
+				return -1;
+			gctx->iv_set = 0;
+			return 0;
+		}
+		CRYPTO_mgm128_tag(&gctx->mgm, ctx->buf, 16);
+		gctx->tag_len = 16;
+
+		/* Don't reuse the IV */
+		gctx->iv_set = 0;
+		return 0;
+	}
+
+}
+
+#define CUSTOM_FLAGS \
+    ( EVP_CIPH_FLAG_DEFAULT_ASN1 | EVP_CIPH_CUSTOM_IV | \
+      EVP_CIPH_FLAG_CUSTOM_CIPHER | EVP_CIPH_ALWAYS_CALL_INIT | \
+      EVP_CIPH_CTRL_INIT | EVP_CIPH_CUSTOM_COPY )
+
+#define NID_kuznyechik_mgm NID_id_tc26_cipher_gostr3412_2015_kuznyechik_mgm
+
+BLOCK_CIPHER_def1(kuznyechik, mgm, mgm, GCM, EVP_KUZNYECHIK_MGM_CTX,
+		NID_kuznyechik, 1, 32, 16,
+		EVP_CIPH_FLAG_AEAD_CIPHER|CUSTOM_FLAGS,
+		kuznyechik_mgm_init_key, kuznyechik_mgm_cleanup,
+		EVP_CIPHER_set_asn1_iv,
+		EVP_CIPHER_get_asn1_iv,
+		kuznyechik_mgm_ctrl)
 
 static int
 aead_kuznyechik_mgm_init(EVP_AEAD_CTX *ctx, const unsigned char *key, size_t key_len,
