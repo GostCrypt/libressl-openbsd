@@ -26,6 +26,7 @@
 #include <openssl/modes.h>
 #include <openssl/gost.h>
 #include "evp_locl.h"
+#include "modes_lcl.h"
 
 typedef struct {
 	KUZNYECHIK_KEY ks;
@@ -198,5 +199,165 @@ BLOCK_CIPHER_def1(kuznyechik, ctr_acpkm, ctr_acpkm, CTR, EVP_KUZNYECHIK_CTX,
 		kuznyechik_ctr_acpkm_set_asn1_params,
 		kuznyechik_ctr_acpkm_get_asn1_params,
 		kuznyechik_acpkm_ctl)
+
+#define EVP_AEAD_KUZNYECHIK_MGM_TAG_LEN 16
+
+struct aead_kuznyechik_mgm_ctx {
+	KUZNYECHIK_KEY ks;
+	MGM128_CONTEXT mgm;
+	unsigned char tag_len;
+};
+
+static void
+kuznyechik_mgm_set_key(KUZNYECHIK_KEY *kuznyechik_key, MGM128_CONTEXT *mgm_ctx,
+    const unsigned char *key, size_t key_len)
+{
+	Kuznyechik_set_key(kuznyechik_key, key, 1);
+	CRYPTO_mgm128_init(mgm_ctx, kuznyechik_key, (block128_f)Kuznyechik_encrypt);
+}
+
+static int
+aead_kuznyechik_mgm_init(EVP_AEAD_CTX *ctx, const unsigned char *key, size_t key_len,
+    size_t tag_len)
+{
+	struct aead_kuznyechik_mgm_ctx *mgm_ctx;
+	const size_t key_bits = key_len * 8;
+
+	/* EVP_AEAD_CTX_init should catch this. */
+	if (key_bits != 256) {
+		EVPerror(EVP_R_BAD_KEY_LENGTH);
+		return 0;
+	}
+
+	if (tag_len == EVP_AEAD_DEFAULT_TAG_LENGTH)
+		tag_len = EVP_AEAD_KUZNYECHIK_MGM_TAG_LEN;
+
+	if (tag_len > EVP_AEAD_KUZNYECHIK_MGM_TAG_LEN) {
+		EVPerror(EVP_R_TAG_TOO_LARGE);
+		return 0;
+	}
+
+	if ((mgm_ctx = calloc(1, sizeof(struct aead_kuznyechik_mgm_ctx))) == NULL)
+		return 0;
+
+	kuznyechik_mgm_set_key(&mgm_ctx->ks, &mgm_ctx->mgm, key, key_len);
+
+	mgm_ctx->tag_len = tag_len;
+	ctx->aead_state = mgm_ctx;
+
+	return 1;
+}
+
+static void
+aead_kuznyechik_mgm_cleanup(EVP_AEAD_CTX *ctx)
+{
+	struct aead_kuznyechik_mgm_ctx *mgm_ctx = ctx->aead_state;
+
+	freezero(mgm_ctx, sizeof(*mgm_ctx));
+}
+
+static int
+aead_kuznyechik_mgm_seal(const EVP_AEAD_CTX *ctx, unsigned char *out, size_t *out_len,
+    size_t max_out_len, const unsigned char *nonce, size_t nonce_len,
+    const unsigned char *in, size_t in_len, const unsigned char *ad,
+    size_t ad_len)
+{
+	const struct aead_kuznyechik_mgm_ctx *mgm_ctx = ctx->aead_state;
+	MGM128_CONTEXT mgm;
+	size_t bulk = 0;
+
+	if (max_out_len < in_len + mgm_ctx->tag_len) {
+		EVPerror(EVP_R_BUFFER_TOO_SMALL);
+		return 0;
+	}
+
+	if (nonce_len != MGM128_NONCE_LEN) {
+		EVPerror(EVP_R_IV_TOO_LARGE);
+		return 0;
+	}
+
+	memcpy(&mgm, &mgm_ctx->mgm, sizeof(mgm));
+	CRYPTO_mgm128_setiv(&mgm, nonce);
+
+	if (ad_len > 0 && CRYPTO_mgm128_aad(&mgm, ad, ad_len))
+		return 0;
+
+	if (CRYPTO_mgm128_encrypt(&mgm, in + bulk, out + bulk,
+				in_len - bulk))
+		return 0;
+
+	CRYPTO_mgm128_tag(&mgm, out + in_len, mgm_ctx->tag_len);
+	*out_len = in_len + mgm_ctx->tag_len;
+
+	return 1;
+}
+
+static int
+aead_kuznyechik_mgm_open(const EVP_AEAD_CTX *ctx, unsigned char *out, size_t *out_len,
+    size_t max_out_len, const unsigned char *nonce, size_t nonce_len,
+    const unsigned char *in, size_t in_len, const unsigned char *ad,
+    size_t ad_len)
+{
+	const struct aead_kuznyechik_mgm_ctx *mgm_ctx = ctx->aead_state;
+	unsigned char tag[EVP_AEAD_KUZNYECHIK_MGM_TAG_LEN];
+	MGM128_CONTEXT mgm;
+	size_t plaintext_len;
+	size_t bulk = 0;
+
+	if (in_len < mgm_ctx->tag_len) {
+		EVPerror(EVP_R_BAD_DECRYPT);
+		return 0;
+	}
+
+	plaintext_len = in_len - mgm_ctx->tag_len;
+
+	if (max_out_len < plaintext_len) {
+		EVPerror(EVP_R_BUFFER_TOO_SMALL);
+		return 0;
+	}
+
+	if (nonce_len != MGM128_NONCE_LEN) {
+		EVPerror(EVP_R_IV_TOO_LARGE);
+		return 0;
+	}
+
+	memcpy(&mgm, &mgm_ctx->mgm, sizeof(mgm));
+	CRYPTO_mgm128_setiv(&mgm, nonce);
+
+	if (CRYPTO_mgm128_aad(&mgm, ad, ad_len))
+		return 0;
+
+	if (CRYPTO_mgm128_decrypt(&mgm, in + bulk, out + bulk,
+				in_len - bulk - mgm_ctx->tag_len))
+		return 0;
+
+	CRYPTO_mgm128_tag(&mgm, tag, mgm_ctx->tag_len);
+	if (timingsafe_memcmp(tag, in + plaintext_len, mgm_ctx->tag_len) != 0) {
+		EVPerror(EVP_R_BAD_DECRYPT);
+		return 0;
+	}
+
+	*out_len = plaintext_len;
+
+	return 1;
+}
+
+static const EVP_AEAD aead_kuznyechik_mgm = {
+	.key_len = 32,
+	.nonce_len = 16,
+	.overhead = EVP_AEAD_KUZNYECHIK_MGM_TAG_LEN,
+	.max_tag_len = EVP_AEAD_KUZNYECHIK_MGM_TAG_LEN,
+
+	.init = aead_kuznyechik_mgm_init,
+	.cleanup = aead_kuznyechik_mgm_cleanup,
+	.seal = aead_kuznyechik_mgm_seal,
+	.open = aead_kuznyechik_mgm_open,
+};
+
+const EVP_AEAD *
+EVP_aead_kuznyechik_mgm(void)
+{
+	return &aead_kuznyechik_mgm;
+}
 
 #endif
