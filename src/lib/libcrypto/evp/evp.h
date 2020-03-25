@@ -1292,6 +1292,8 @@ const EVP_AEAD *EVP_aead_xchacha20_poly1305(void);
 #if !defined(OPENSSL_NO_GOST)
 /* EVP_aead_kuznyechik_mgm is Kuznyechik in Multilinear Galois Mode. */
 const EVP_AEAD *EVP_aead_kuznyechik_mgm(void);
+/* EVP_aead_magma_mgm is Magma in Multilinear Galois Mode. */
+const EVP_AEAD *EVP_aead_magma_mgm(void);
 #endif
 
 /* EVP_AEAD_key_length returns the length of the keys used. */
