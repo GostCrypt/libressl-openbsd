@@ -108,4 +108,15 @@ struct ccm128_context {
 	void *key;
 };
 
+struct mgm128_context {
+	u64 len[2]; /* aad and data len */
+	u64 sum[2];
+	u8 y[16], z[16], part[16];
+	block128_f block;
+	void *key;
+	unsigned int a_remain, d_remain;
+};
+
+#define MGM128_NONCE_LEN 16
+
 __END_HIDDEN_DECLS

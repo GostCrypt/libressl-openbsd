@@ -139,6 +139,22 @@ typedef struct xts128_context XTS128_CONTEXT;
 int CRYPTO_xts128_encrypt(const XTS128_CONTEXT *ctx, const unsigned char iv[16],
 	const unsigned char *inp, unsigned char *out, size_t len, int enc);
 
+typedef struct mgm128_context MGM128_CONTEXT;
+
+void CRYPTO_mgm128_init(MGM128_CONTEXT *ctx,void *key,block128_f block);
+void CRYPTO_mgm128_setiv(MGM128_CONTEXT *ctx, const unsigned char *iv);
+int CRYPTO_mgm128_aad(MGM128_CONTEXT *ctx, const unsigned char *aad,
+			size_t len);
+int CRYPTO_mgm128_encrypt(MGM128_CONTEXT *ctx,
+			const unsigned char *in, unsigned char *out,
+			size_t len);
+int CRYPTO_mgm128_decrypt(MGM128_CONTEXT *ctx,
+			const unsigned char *in, unsigned char *out,
+			size_t len);
+int CRYPTO_mgm128_finish(MGM128_CONTEXT *ctx,const unsigned char *tag,
+			size_t len);
+void CRYPTO_mgm128_tag(MGM128_CONTEXT *ctx, unsigned char *tag, size_t len);
+
 typedef void (*block64_f)(const unsigned char in[8],
 			unsigned char out[8],
 			const void *key);
