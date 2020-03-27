@@ -2182,6 +2182,13 @@ ssl3_get_cert_verify(SSL *s)
 			al = SSL_AD_INTERNAL_ERROR;
 			goto f_err;
 		}
+		if (sigalg->key_type == NID_id_GostR3410_2001 &&
+		    EVP_PKEY_CTX_ctrl(pctx, -1, EVP_PKEY_OP_VERIFY,
+				      EVP_PKEY_CTRL_GOST_SIG_FORMAT,
+				      GOST_SIG_FORMAT_RS_LE, NULL) <= 0) {
+			al = SSL_AD_INTERNAL_ERROR;
+			goto f_err;
+		}
 		if (!EVP_DigestVerifyUpdate(&mctx, hdata, hdatalen)) {
 			SSLerror(s, ERR_R_EVP_LIB);
 			al = SSL_AD_INTERNAL_ERROR;
