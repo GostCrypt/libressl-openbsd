@@ -40,7 +40,7 @@ const struct ssl_sigalg sigalgs[] = {
 	{
 		.value = SIGALG_GOSTR12_512_STREEBOG_512,
 		.md = EVP_streebog512,
-		.key_type = EVP_PKEY_GOSTR12_512,
+		.key_type = EVP_PKEY_GOSTR01,
 	},
 #endif
 	{
@@ -69,7 +69,7 @@ const struct ssl_sigalg sigalgs[] = {
 	{
 		.value = SIGALG_GOSTR12_256_STREEBOG_256,
 		.md = EVP_streebog256,
-		.key_type = EVP_PKEY_GOSTR12_256,
+		.key_type = EVP_PKEY_GOSTR01,
 	},
 	{
 		.value = SIGALG_GOSTR01_GOST94,
@@ -170,6 +170,11 @@ uint16_t tls12_sigalgs[] = {
 	SIGALG_ECDSA_SECP256R1_SHA256,
 	SIGALG_RSA_PKCS1_SHA1, /* XXX */
 	SIGALG_ECDSA_SHA1,     /* XXX */
+#ifndef OPENSSL_NO_GOST
+	SIGALG_GOSTR12_512_STREEBOG_512,
+	SIGALG_GOSTR12_256_STREEBOG_256,
+	SIGALG_GOSTR01_GOST94,
+#endif
 };
 size_t tls12_sigalgs_len = (sizeof(tls12_sigalgs) / sizeof(tls12_sigalgs[0]));
 
@@ -254,8 +259,38 @@ ssl_sigalg_pkey_ok(const struct ssl_sigalg *sigalg, EVP_PKEY *pkey,
 		}
 	}
 
+#ifndef OPENSSL_NO_GOST
+	if (pkey->type == EVP_PKEY_GOSTR01) {
+		int nid;
+
+		if (!EVP_PKEY_get_default_digest_nid(pkey, &nid))
+			return 0;
+
+		return EVP_MD_type(sigalg->md()) == nid;
+	}
+#endif
+
 	return 1;
 }
+
+#ifndef OPENSSL_NO_GOST
+static const struct ssl_sigalg *
+ssl_sigalg_gost_select(SSL *s, EVP_PKEY *pkey)
+{
+	int nid = NID_id_GostR3411_94;
+
+	if (!EVP_PKEY_get_default_digest_nid(pkey, &nid)) {
+		SSLerror(s, ERR_R_EVP_LIB);
+		/* fallthrough, return GOST94 */
+	}
+	if (nid == NID_id_tc26_gost3411_2012_256)
+		return ssl_sigalg_lookup(SIGALG_GOSTR12_256_STREEBOG_256);
+	else if (nid == NID_id_tc26_gost3411_2012_512)
+		return ssl_sigalg_lookup(SIGALG_GOSTR12_512_STREEBOG_512);
+	else
+		return ssl_sigalg_lookup(SIGALG_GOSTR01_GOST94);
+}
+#endif
 
 const struct ssl_sigalg *
 ssl_sigalg_select(SSL *s, EVP_PKEY *pkey)
@@ -280,7 +315,7 @@ ssl_sigalg_select(SSL *s, EVP_PKEY *pkey)
 			return ssl_sigalg_lookup(SIGALG_ECDSA_SHA1);
 #ifndef OPENSSL_NO_GOST
 		case EVP_PKEY_GOSTR01:
-			return ssl_sigalg_lookup(SIGALG_GOSTR01_GOST94);
+			return ssl_sigalg_gost_select(s, pkey);
 #endif
 		}
 		SSLerror(s, SSL_R_UNKNOWN_PKEY_TYPE);
@@ -300,7 +335,7 @@ ssl_sigalg_select(SSL *s, EVP_PKEY *pkey)
 			return ssl_sigalg_lookup(SIGALG_ECDSA_SHA1);
 #ifndef OPENSSL_NO_GOST
 		case EVP_PKEY_GOSTR01:
-			return ssl_sigalg_lookup(SIGALG_GOSTR01_GOST94);
+			return ssl_sigalg_gost_select(s, pkey);
 #endif
 		}
 		SSLerror(s, SSL_R_UNKNOWN_PKEY_TYPE);
