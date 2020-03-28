@@ -373,6 +373,15 @@ ssl_sigalg_select(SSL *s, EVP_PKEY *pkey)
 			return sigalg;
 	}
 
+#ifndef OPENSSL_NO_GOST
+	/* Windows CSPs fail to send proper SigAlgs extension (it does not
+	 * include GOST entries even for GOST CipherSuites). To ensure
+	 * interoperability, assume that the server will understand GOST
+	 * sigalgs if it has sent GOST certificate. */
+	if (pkey->type == EVP_PKEY_GOSTR01)
+		return ssl_sigalg_gost_select(s, pkey);
+#endif
+
 	SSLerror(s, SSL_R_UNKNOWN_PKEY_TYPE);
 	return NULL;
 }
