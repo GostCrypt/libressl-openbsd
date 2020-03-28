@@ -38,6 +38,11 @@ const struct ssl_sigalg sigalgs[] = {
 	},
 #ifndef OPENSSL_NO_GOST
 	{
+		.value = SIGALG_GOSTR12_512,
+		.md = EVP_streebog512,
+		.key_type = EVP_PKEY_GOSTR01,
+	},
+	{
 		.value = SIGALG_GOSTR12_512_STREEBOG_512,
 		.md = EVP_streebog512,
 		.key_type = EVP_PKEY_GOSTR01,
@@ -66,6 +71,11 @@ const struct ssl_sigalg sigalgs[] = {
 		.curve_nid = NID_X9_62_prime256v1,
 	},
 #ifndef OPENSSL_NO_GOST
+	{
+		.value = SIGALG_GOSTR12_256,
+		.md = EVP_streebog256,
+		.key_type = EVP_PKEY_GOSTR01,
+	},
 	{
 		.value = SIGALG_GOSTR12_256_STREEBOG_256,
 		.md = EVP_streebog256,
@@ -171,7 +181,9 @@ uint16_t tls12_sigalgs[] = {
 	SIGALG_RSA_PKCS1_SHA1, /* XXX */
 	SIGALG_ECDSA_SHA1,     /* XXX */
 #ifndef OPENSSL_NO_GOST
+	SIGALG_GOSTR12_512,
 	SIGALG_GOSTR12_512_STREEBOG_512,
+	SIGALG_GOSTR12_256,
 	SIGALG_GOSTR12_256_STREEBOG_256,
 	SIGALG_GOSTR01_GOST94,
 #endif
