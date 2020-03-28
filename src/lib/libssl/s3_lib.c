@@ -2555,6 +2555,10 @@ ssl3_get_req_cert_types(SSL *s, CBB *cbb)
 			return 0;
 		if (!CBB_add_u8(cbb, TLS_CT_GOST12_512_SIGN))
 			return 0;
+		if (!CBB_add_u8(cbb, TLS_CT_GOST12_256_SIGN_COMPAT))
+			return 0;
+		if (!CBB_add_u8(cbb, TLS_CT_GOST12_512_SIGN_COMPAT))
+			return 0;
 	}
 #endif
 

@@ -739,8 +739,10 @@ SSL_CTX_callback_ctrl(ssl,SSL_CTRL_SET_TLSEXT_TICKET_KEY_CB,(void (*)(void))cb)
 #define TLS_CT_RSA_FIXED_ECDH		65
 #define TLS_CT_ECDSA_FIXED_ECDH 	66
 #define TLS_CT_GOST01_SIGN		22
-#define TLS_CT_GOST12_256_SIGN		238 /* FIXME: IANA */
-#define TLS_CT_GOST12_512_SIGN		239 /* FIXME: IANA */
+#define TLS_CT_GOST12_256_SIGN		67
+#define TLS_CT_GOST12_512_SIGN		68
+#define TLS_CT_GOST12_256_SIGN_COMPAT	238 /* pre-IANA, for compat */
+#define TLS_CT_GOST12_512_SIGN_COMPAT	239 /* pre-IANA, for compat */
 /* when correcting this number, correct also SSL3_CT_NUMBER in ssl3.h (see
  * comment there) */
 #define TLS_CT_NUMBER			11
