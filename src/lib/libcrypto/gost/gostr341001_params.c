@@ -94,12 +94,22 @@ static const GostR3410_params GostR3410_256_params[] = {
 	{ "0",  NID_id_GostR3410_2001_TestParamSet },
 	{ "XA", NID_id_GostR3410_2001_CryptoPro_XchA_ParamSet },
 	{ "XB", NID_id_GostR3410_2001_CryptoPro_XchB_ParamSet },
+	{ "TCA", NID_id_tc26_gost_3410_12_256_paramSetA },
+	{ "TCB", NID_id_tc26_gost_3410_12_256_paramSetB },
+	{ "TCC", NID_id_tc26_gost_3410_12_256_paramSetC },
+	{ "TCD", NID_id_tc26_gost_3410_12_256_paramSetD },
 	{ NULL, NID_undef },
 };
 
 static const GostR3410_params GostR3410_512_params[] = {
 	{ "A",  NID_id_tc26_gost_3410_12_512_paramSetA },
 	{ "B",  NID_id_tc26_gost_3410_12_512_paramSetB },
+	{ "C",  NID_id_tc26_gost_3410_12_512_paramSetC },
+	{ "0",  NID_id_tc26_gost_3410_12_512_paramSetTest},
+	/* Duplicates for compatibility with OpenSSL */
+	{ "TCA", NID_id_tc26_gost_3410_12_512_paramSetA },
+	{ "TCB", NID_id_tc26_gost_3410_12_512_paramSetB },
+	{ "TCC", NID_id_tc26_gost_3410_12_512_paramSetC },
 	{ NULL, NID_undef },
 };
 
