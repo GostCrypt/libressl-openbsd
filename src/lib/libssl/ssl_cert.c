@@ -253,6 +253,10 @@ ssl_cert_dup(CERT *cert)
 				/* We have an ECC key */
 				break;
 
+			case SSL_PKEY_GOST01:
+				/* We have a GOST key */
+				break;
+
 			default:
 				/* Can't happen. */
 				SSLerrorx(SSL_R_LIBRARY_BUG);
