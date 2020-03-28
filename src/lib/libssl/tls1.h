@@ -735,7 +735,6 @@ SSL_CTX_callback_ctrl(ssl,SSL_CTRL_SET_TLSEXT_TICKET_KEY_CB,(void (*)(void))cb)
 #define TLS_CT_DSS_SIGN			2
 #define TLS_CT_RSA_FIXED_DH		3
 #define TLS_CT_DSS_FIXED_DH		4
-#define TLS_CT_GOST94_SIGN		21
 #define TLS_CT_GOST01_SIGN		22
 #define TLS_CT_ECDSA_SIGN		64
 #define TLS_CT_RSA_FIXED_ECDH		65
