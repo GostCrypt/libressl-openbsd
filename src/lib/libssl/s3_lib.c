@@ -2549,8 +2549,6 @@ ssl3_get_req_cert_types(SSL *s, CBB *cbb)
 
 #ifndef OPENSSL_NO_GOST
 	if ((alg_k & SSL_kGOST) != 0) {
-		if (!CBB_add_u8(cbb, TLS_CT_GOST94_SIGN))
-			return 0;
 		if (!CBB_add_u8(cbb, TLS_CT_GOST01_SIGN))
 			return 0;
 		if (!CBB_add_u8(cbb, TLS_CT_GOST12_256_SIGN))
