@@ -260,7 +260,7 @@ EVP_MD_CTX_copy_ex(EVP_MD_CTX *out, const EVP_MD_CTX *in)
 {
 	unsigned char *tmp_buf;
 
-	if ((in == NULL) || (in->digest == NULL)) {
+	if (in == NULL) {
 		EVPerror(EVP_R_INPUT_NOT_INITIALIZED);
 		return 0;
 	}
@@ -280,7 +280,7 @@ EVP_MD_CTX_copy_ex(EVP_MD_CTX *out, const EVP_MD_CTX *in)
 	EVP_MD_CTX_cleanup(out);
 	memcpy(out, in, sizeof *out);
 
-	if (in->md_data && out->digest->ctx_size) {
+	if (in->md_data && out->digest && out->digest->ctx_size) {
 		if (tmp_buf) {
 			out->md_data = tmp_buf;
 		} else {
@@ -303,7 +303,7 @@ EVP_MD_CTX_copy_ex(EVP_MD_CTX *out, const EVP_MD_CTX *in)
 		}
 	}
 
-	if (out->digest->copy)
+	if (out->digest && out->digest->copy)
 		return out->digest->copy(out, in);
 
 	return 1;
