@@ -255,6 +255,37 @@ pkey_set_type(EVP_PKEY *pkey, int type, const char *str, int len)
 	return 1;
 }
 
+EVP_PKEY *
+EVP_PKEY_new_CMAC_key(ENGINE *e, const unsigned char *priv,
+    size_t len, const EVP_CIPHER *cipher)
+{
+#ifndef OPENSSL_NO_CMAC
+	EVP_PKEY_CTX *mac_ctx = NULL;
+	EVP_PKEY *mac_key = NULL;
+
+	mac_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_CMAC, e);
+	if (!mac_ctx)
+		return NULL;
+	if (EVP_PKEY_keygen_init(mac_ctx) <= 0)
+		goto merr;
+	if (EVP_PKEY_CTX_ctrl(mac_ctx, -1, EVP_PKEY_OP_KEYGEN,
+	    EVP_PKEY_CTRL_CIPHER, 0, (void *)cipher) <= 0)
+		goto merr;
+	if (EVP_PKEY_CTX_ctrl(mac_ctx, -1, EVP_PKEY_OP_KEYGEN,
+	    EVP_PKEY_CTRL_SET_MAC_KEY, len, (void *)priv) <= 0)
+		goto merr;
+	if (EVP_PKEY_keygen(mac_ctx, &mac_key) <= 0)
+		goto merr;
+
+merr:
+	EVP_PKEY_CTX_free(mac_ctx);
+	return mac_key;
+#else
+	EVPerror(EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
+	return NULL;
+#endif
+}
+
 int
 EVP_PKEY_set_type(EVP_PKEY *pkey, int type)
 {
