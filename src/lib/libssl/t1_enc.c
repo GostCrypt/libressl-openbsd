@@ -408,10 +408,12 @@ tls1_change_cipher_state_cipher(SSL *s, char is_read,
 	EVP_MD_CTX *mac_ctx;
 	EVP_PKEY *mac_key;
 	const EVP_MD *mac;
+	const EVP_CIPHER *mac_cipher;
 	int mac_type;
 
 	cipher = S3I(s)->tmp.new_sym_enc;
 	mac = S3I(s)->tmp.new_hash;
+	mac_cipher = S3I(s)->tmp.new_hash_cipher;
 	mac_type = S3I(s)->tmp.new_mac_pkey_type;
 
 	if (is_read) {
@@ -454,8 +456,14 @@ tls1_change_cipher_state_cipher(SSL *s, char is_read,
 
 	EVP_CipherInit_ex(cipher_ctx, cipher, NULL, key, iv, !is_read);
 
-	if ((mac_key = EVP_PKEY_new_mac_key(mac_type, NULL, mac_secret,
-	    mac_secret_size)) == NULL)
+	if (mac_type == EVP_PKEY_CMAC) {
+		mac_key = EVP_PKEY_new_CMAC_key(NULL, mac_secret,
+				mac_secret_size, mac_cipher);
+	} else {
+		mac_key = EVP_PKEY_new_mac_key(mac_type, NULL, mac_secret,
+				mac_secret_size);
+	}
+	if (mac_key  == NULL)
 		goto err;
 	EVP_DigestSignInit(mac_ctx, NULL, mac, NULL, mac_key);
 	EVP_PKEY_free(mac_key);
@@ -587,6 +595,7 @@ tls1_setup_key_block(SSL *s)
 	const EVP_CIPHER *cipher = NULL;
 	const EVP_AEAD *aead = NULL;
 	const EVP_MD *mac = NULL;
+	const EVP_CIPHER *mac_cipher = NULL;
 	int ret = 0;
 
 	if (S3I(s)->hs.key_block_len != 0)
@@ -601,8 +610,8 @@ tls1_setup_key_block(SSL *s)
 		key_len = EVP_AEAD_key_length(aead);
 		iv_len = SSL_CIPHER_AEAD_FIXED_NONCE_LEN(s->session->cipher);
 	} else {
-		if (!ssl_cipher_get_evp(s->session, &cipher, &mac, &mac_type,
-		    &mac_secret_size)) {
+		if (!ssl_cipher_get_evp(s->session, &cipher, &mac, &mac_cipher,
+		    &mac_type, &mac_secret_size)) {
 			SSLerror(s, SSL_R_CIPHER_OR_HASH_UNAVAILABLE);
 			return (0);
 		}
@@ -613,6 +622,7 @@ tls1_setup_key_block(SSL *s)
 	S3I(s)->tmp.new_aead = aead;
 	S3I(s)->tmp.new_sym_enc = cipher;
 	S3I(s)->tmp.new_hash = mac;
+	S3I(s)->tmp.new_hash_cipher = mac_cipher;
 	S3I(s)->tmp.new_mac_pkey_type = mac_type;
 	S3I(s)->tmp.new_mac_secret_size = mac_secret_size;
 

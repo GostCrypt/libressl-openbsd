@@ -894,6 +894,7 @@ typedef struct ssl3_state_internal_st {
 		const EVP_CIPHER *new_sym_enc;
 		const EVP_AEAD *new_aead;
 		const EVP_MD *new_hash;
+		const EVP_CIPHER *new_hash_cipher;
 		int new_mac_pkey_type;
 		int cert_request;
 	} tmp;
@@ -1145,7 +1146,7 @@ STACK_OF(SSL_CIPHER) *ssl_create_cipher_list(const SSL_METHOD *meth,
     const char *rule_str);
 void ssl_update_cache(SSL *s, int mode);
 int ssl_cipher_get_evp(const SSL_SESSION *s, const EVP_CIPHER **enc,
-    const EVP_MD **md, int *mac_pkey_type, int *mac_secret_size);
+    const EVP_MD **md, const EVP_CIPHER **mac_ciph, int *mac_pkey_type, int *mac_secret_size);
 int ssl_cipher_get_evp_aead(const SSL_SESSION *s, const EVP_AEAD **aead);
 int ssl_get_handshake_evp_md(SSL *s, const EVP_MD **md);
 
