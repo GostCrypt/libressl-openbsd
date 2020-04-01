@@ -448,10 +448,11 @@ static const SSL_CIPHER cipher_aliases[] = {
 
 int
 ssl_cipher_get_evp(const SSL_SESSION *ss, const EVP_CIPHER **enc,
-    const EVP_MD **md, int *mac_pkey_type, int *mac_secret_size)
+    const EVP_MD **md, const EVP_CIPHER **mac_ciph, int *mac_pkey_type, int *mac_secret_size)
 {
 	*enc = NULL;
 	*md = NULL;
+	*mac_ciph = NULL;
 	*mac_pkey_type = NID_undef;
 	*mac_secret_size = 0;
 
@@ -490,6 +491,12 @@ ssl_cipher_get_evp(const SSL_SESSION *ss, const EVP_CIPHER **enc,
 	case SSL_eGOST2814789CNT:
 		*enc = EVP_gost2814789_cnt();
 		break;
+	case SSL_KUZNYECHIK_CTR_ACPKM:
+		*enc = EVP_kuznyechik_ctr_acpkm();
+		break;
+	case SSL_MAGMA_CTR_ACPKM:
+		*enc = EVP_magma_ctr_acpkm();
+		break;
 	}
 
 	switch (ss->cipher->algorithm_mac) {
@@ -514,9 +521,15 @@ ssl_cipher_get_evp(const SSL_SESSION *ss, const EVP_CIPHER **enc,
 	case SSL_STREEBOG256:
 		*md = EVP_streebog256();
 		break;
+	case SSL_MAGMA_OMAC:
+		*mac_ciph = EVP_magma_cbc();
+		break;
+	case SSL_KUZNYECHIK_OMAC:
+		*mac_ciph = EVP_kuznyechik_cbc();
+		break;
 	}
 
-	if (*enc == NULL || *md == NULL)
+	if (*enc == NULL || (*md == NULL && *mac_ciph == NULL))
 		return 0;
 
 	/*
@@ -531,6 +544,9 @@ ssl_cipher_get_evp(const SSL_SESSION *ss, const EVP_CIPHER **enc,
 	if (ss->cipher->algorithm_mac == SSL_GOST89MAC) {
 		*mac_pkey_type = EVP_PKEY_GOSTIMIT;
 		*mac_secret_size = 32; /* XXX */
+	} else if (*mac_ciph) {
+		*mac_pkey_type = EVP_PKEY_CMAC;
+		*mac_secret_size = EVP_CIPHER_key_length(*mac_ciph);
 	} else {
 		*mac_pkey_type = EVP_PKEY_HMAC;
 		*mac_secret_size = EVP_MD_size(*md);
