@@ -2000,7 +2000,7 @@ ssl_set_cert_masks(CERT *c, const SSL_CIPHER *cipher)
 
 	cpk = &(c->pkeys[SSL_PKEY_GOST01]);
 	if (cpk->x509 != NULL && cpk->privatekey != NULL) {
-		mask_k |= SSL_kGOST;
+		mask_k |= SSL_kGOST | SSL_kGOST_KDF;
 		mask_a |= SSL_aGOST01;
 	}
 

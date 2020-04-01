@@ -1947,10 +1947,10 @@ ssl3_get_client_kex_ecdhe(SSL *s, CBS *cbs)
 }
 
 static int
-ssl3_get_client_kex_gost(SSL *s, CBS *cbs)
+ssl3_get_client_kex_gost(SSL *s, CBS *cbs, int psexp)
 {
 	EVP_PKEY_CTX *pkey_ctx;
-	EVP_PKEY *client_pub_pkey = NULL, *pk = NULL;
+	EVP_PKEY *pk = NULL;
 	unsigned char premaster_secret[32];
 	unsigned long alg_a;
 	size_t outlen = 32;
@@ -1966,56 +1966,83 @@ ssl3_get_client_kex_gost(SSL *s, CBS *cbs)
 	if ((pkey_ctx = EVP_PKEY_CTX_new(pk, NULL)) == NULL)
 		goto err;
 	if (EVP_PKEY_decrypt_init(pkey_ctx) <= 0)
-		goto gerr;
+		goto err;
 
-	/*
-	 * If client certificate is present and is of the same type,
-	 * maybe use it for key exchange.
-	 * Don't mind errors from EVP_PKEY_derive_set_peer, because
-	 * it is completely valid to use a client certificate for
-	 * authorization only.
-	 */
-	if ((client_pub_pkey = X509_get_pubkey(s->session->peer)) != NULL) {
-		if (EVP_PKEY_derive_set_peer(pkey_ctx,
-		    client_pub_pkey) <= 0)
-			ERR_clear_error();
+	if (!psexp) {
+		EVP_PKEY *client_pub_pkey = X509_get_pubkey(s->session->peer);
+		/*
+		 * If client certificate is present and is of the same type,
+		 * maybe use it for key exchange.
+		 * Don't mind errors from EVP_PKEY_derive_set_peer, because
+		 * it is completely valid to use a client certificate for
+		 * authorization only.
+		 */
+		if (client_pub_pkey != NULL) {
+			if (EVP_PKEY_derive_set_peer(pkey_ctx, client_pub_pkey) <= 0)
+				ERR_clear_error();
+			EVP_PKEY_free(client_pub_pkey);
+		}
+
+		/*
+		 * Compute shared IV and store it in algorithm-specific context data.
+		 */
+		if (!tls1_set_gost_ukm(s, pkey_ctx, psexp))
+			goto err;
+
+		/* Decrypt session key */
+		if (!CBS_get_asn1(cbs, &gostblob, CBS_ASN1_SEQUENCE))
+			goto truncated;
+	} else {
+		int format;
+
+		if (S3I(s)->hs.new_cipher->algorithm_enc == SSL_MAGMA_CTR_ACPKM)
+			format = GOST_ENC_FORMAT_PSKEY_MAGMA;
+		else
+			format = GOST_ENC_FORMAT_PSKEY_KUZNYECHIK;
+
+		if (EVP_PKEY_CTX_ctrl(pkey_ctx, -1, EVP_PKEY_OP_DECRYPT,
+				      EVP_PKEY_CTRL_GOST_ENC_FORMAT,
+				      format, NULL) <= 0) {
+			SSLerror(s, ERR_R_EVP_LIB);
+			goto err;
+		}
+
+		/*
+		 * Compute shared IV and store it in algorithm-specific context data.
+		 */
+		if (!tls1_set_gost_ukm(s, pkey_ctx, psexp))
+			goto err;
+
+		/* Decrypt session key */
+		if (!CBS_get_asn1_element(cbs, &gostblob, CBS_ASN1_SEQUENCE))
+			goto truncated;
 	}
 
-	/* Decrypt session key */
-	if (!CBS_get_asn1(cbs, &gostblob, CBS_ASN1_SEQUENCE))
-		goto truncated;
 	if (CBS_len(cbs) != 0)
 		goto truncated;
 	if (EVP_PKEY_decrypt(pkey_ctx, premaster_secret, &outlen,
-	    CBS_data(&gostblob), CBS_len(&gostblob)) <= 0) {
+				CBS_data(&gostblob), CBS_len(&gostblob)) <= 0 ||
+	    outlen != 32) {
 		SSLerror(s, SSL_R_DECRYPTION_FAILED);
-		goto gerr;
+		goto err;
 	}
 
 	/* Generate master secret */
 	s->session->master_key_length =
 	    tls1_generate_master_secret(
-		s, s->session->master_key, premaster_secret, 32);
+		s, s->session->master_key, premaster_secret, outlen);
 
-	/* Check if pubkey from client certificate was used */
-	if (EVP_PKEY_CTX_ctrl(pkey_ctx, -1, -1,
-	    EVP_PKEY_CTRL_PEER_KEY, 2, NULL) > 0)
-		ret = 2;
-	else
-		ret = 1;
- gerr:
-	EVP_PKEY_free(client_pub_pkey);
+	ret = 1;
+
+err:
 	EVP_PKEY_CTX_free(pkey_ctx);
-	if (ret)
-		return (ret);
-	else
-		goto err;
+
+	return ret;
 
  truncated:
 	al = SSL_AD_DECODE_ERROR;
 	SSLerror(s, SSL_R_BAD_PACKET_LENGTH);
 	ssl3_send_alert(s, SSL3_AL_FATAL, al);
- err:
 	return (-1);
 }
 
@@ -2050,7 +2077,10 @@ ssl3_get_client_key_exchange(SSL *s)
 		if (ssl3_get_client_kex_ecdhe(s, &cbs) != 1)
 			goto err;
 	} else if (alg_k & SSL_kGOST) {
-		if (ssl3_get_client_kex_gost(s, &cbs) != 1)
+		if (ssl3_get_client_kex_gost(s, &cbs, 0) != 1)
+			goto err;
+	} else if (alg_k & SSL_kGOST_KDF) {
+		if (ssl3_get_client_kex_gost(s, &cbs, 1) != 1)
 			goto err;
 	} else {
 		al = SSL_AD_HANDSHAKE_FAILURE;

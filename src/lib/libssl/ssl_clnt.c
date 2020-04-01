@@ -2141,18 +2141,14 @@ ssl3_send_client_kex_ecdhe(SSL *s, SESS_CERT *sc, CBB *cbb)
 }
 
 static int
-ssl3_send_client_kex_gost(SSL *s, SESS_CERT *sess_cert, CBB *cbb)
+ssl3_send_client_kex_gost(SSL *s, SESS_CERT *sess_cert, CBB *cbb, unsigned int psexp)
 {
-	unsigned char premaster_secret[32], shared_ukm[32], tmp[256];
+	unsigned char premaster_secret[32], *tmp = NULL;
 	EVP_PKEY *pub_key = NULL;
 	EVP_PKEY_CTX *pkey_ctx;
 	X509 *peer_cert;
 	size_t msglen;
-	unsigned int md_len;
-	EVP_MD_CTX *ukm_hash;
 	int ret = -1;
-	int nid;
-	CBB gostblob;
 
 	/* Get server sertificate PKEY and create ctx from it */
 	peer_cert = sess_cert->peer_pkeys[SSL_PKEY_GOST01].x509;
@@ -2172,12 +2168,13 @@ ssl3_send_client_kex_gost(SSL *s, SESS_CERT *sess_cert, CBB *cbb)
 	EVP_PKEY_encrypt_init(pkey_ctx);
 
 	/* Generate session key. */
-	arc4random_buf(premaster_secret, 32);
+	arc4random_buf(premaster_secret, sizeof(premaster_secret));
 
 	/*
 	 * If we have client certificate, use its secret as peer key.
+	 * Only for old (non-PSexp) key exchange.
 	 */
-	if (S3I(s)->tmp.cert_req && s->cert->key->privatekey) {
+	if (!psexp && S3I(s)->tmp.cert_req && s->cert->key->privatekey) {
 		if (EVP_PKEY_derive_set_peer(pkey_ctx,
 		    s->cert->key->privatekey) <=0) {
 			/*
@@ -2186,49 +2183,62 @@ ssl3_send_client_kex_gost(SSL *s, SESS_CERT *sess_cert, CBB *cbb)
 			 */
 			ERR_clear_error();
 		}
+	} else if (psexp) {
+		int format;
+
+		if (S3I(s)->hs.new_cipher->algorithm_enc == SSL_MAGMA_CTR_ACPKM)
+			format = GOST_ENC_FORMAT_PSKEY_MAGMA;
+		else
+			format = GOST_ENC_FORMAT_PSKEY_KUZNYECHIK;
+
+		if (EVP_PKEY_CTX_ctrl(pkey_ctx, -1, EVP_PKEY_OP_ENCRYPT,
+				      EVP_PKEY_CTRL_GOST_ENC_FORMAT,
+				      format, NULL) <= 0) {
+			SSLerror(s, ERR_R_EVP_LIB);
+			goto err;
+		}
+
 	}
 
 	/*
 	 * Compute shared IV and store it in algorithm-specific context data.
 	 */
-	ukm_hash = EVP_MD_CTX_new();
-	if (ukm_hash == NULL) {
-		SSLerror(s, ERR_R_MALLOC_FAILURE);
+	if (!tls1_set_gost_ukm(s, pkey_ctx, psexp))
 		goto err;
-	}
-
-	if (ssl_get_algorithm2(s) & SSL_HANDSHAKE_MAC_GOST94)
-		nid = NID_id_GostR3411_94;
-	else
-		nid = NID_id_tc26_gost3411_2012_256;
-	if (!EVP_DigestInit(ukm_hash, EVP_get_digestbynid(nid)))
-		goto err;
-	EVP_DigestUpdate(ukm_hash, s->s3->client_random, SSL3_RANDOM_SIZE);
-	EVP_DigestUpdate(ukm_hash, s->s3->server_random, SSL3_RANDOM_SIZE);
-	EVP_DigestFinal_ex(ukm_hash, shared_ukm, &md_len);
-	EVP_MD_CTX_free(ukm_hash);
-	if (EVP_PKEY_CTX_ctrl(pkey_ctx, -1, EVP_PKEY_OP_ENCRYPT,
-	    EVP_PKEY_CTRL_SET_IV, 8, shared_ukm) < 0) {
-		SSLerror(s, SSL_R_LIBRARY_BUG);
-		goto err;
-	}
 
 	/*
 	 * Make GOST keytransport blob message, encapsulate it into sequence.
 	 */
-	msglen = 255;
-	if (EVP_PKEY_encrypt(pkey_ctx, tmp, &msglen, premaster_secret,
-	    32) < 0) {
+	if (EVP_PKEY_encrypt(pkey_ctx, NULL, &msglen,
+			     premaster_secret, sizeof(premaster_secret)) < 0) {
+		SSLerror(s, SSL_R_LIBRARY_BUG);
+		goto err;
+	}
+	if ((tmp = malloc(msglen)) == NULL) {
+		SSLerror(s, ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
+	if (EVP_PKEY_encrypt(pkey_ctx, tmp, &msglen,
+			     premaster_secret, sizeof(premaster_secret)) < 0) {
 		SSLerror(s, SSL_R_LIBRARY_BUG);
 		goto err;
 	}
 
-	if (!CBB_add_asn1(cbb, &gostblob, CBS_ASN1_SEQUENCE))
-		goto err;
-	if (!CBB_add_bytes(&gostblob, tmp, msglen))
-		goto err;
-	if (!CBB_flush(cbb))
-		goto err;
+	if (psexp) {
+		if (!CBB_add_bytes(cbb, tmp, msglen))
+			goto err;
+		if (!CBB_flush(cbb))
+			goto err;
+	} else {
+		CBB gostblob;
+
+		if (!CBB_add_asn1(cbb, &gostblob, CBS_ASN1_SEQUENCE))
+			goto err;
+		if (!CBB_add_bytes(&gostblob, tmp, msglen))
+			goto err;
+		if (!CBB_flush(cbb))
+			goto err;
+	}
 
 	/* Check if pubkey from client certificate was used. */
 	if (EVP_PKEY_CTX_ctrl(pkey_ctx, -1, -1, EVP_PKEY_CTRL_PEER_KEY, 2,
@@ -2283,7 +2293,10 @@ ssl3_send_client_key_exchange(SSL *s)
 			if (ssl3_send_client_kex_ecdhe(s, sess_cert, &kex) != 1)
 				goto err;
 		} else if (alg_k & SSL_kGOST) {
-			if (ssl3_send_client_kex_gost(s, sess_cert, &kex) != 1)
+			if (ssl3_send_client_kex_gost(s, sess_cert, &kex, 0) != 1)
+				goto err;
+		} else if (alg_k & SSL_kGOST_KDF) {
+			if (ssl3_send_client_kex_gost(s, sess_cert, &kex, 1) != 1)
 				goto err;
 		} else {
 			ssl3_send_alert(s, SSL3_AL_FATAL,
