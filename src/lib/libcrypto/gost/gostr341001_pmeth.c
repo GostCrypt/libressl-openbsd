@@ -130,8 +130,10 @@ struct gost_pmeth_data {
 	int digest_nid;
 	EVP_MD *md;
 	unsigned char *shared_ukm;
+	unsigned int shared_ukm_len;
 	int peer_key_used;
 	int sig_format;
+	int enc_format;
 };
 
 static int
@@ -165,8 +167,8 @@ pkey_gost01_copy(EVP_PKEY_CTX *dst, EVP_PKEY_CTX *src)
 	src_data = EVP_PKEY_CTX_get_data(src);
 	dst_data = EVP_PKEY_CTX_get_data(dst);
 	*dst_data = *src_data;
-	if (src_data->shared_ukm != NULL)
-		dst_data->shared_ukm = NULL;
+	dst_data->shared_ukm = NULL;
+	dst_data->shared_ukm_len = 0;
 	return 1;
 }
 
@@ -310,11 +312,12 @@ err:
 	return ok;
 }
 
-static int
+int
 gost01_VKO_key(EVP_PKEY *pub_key, EVP_PKEY *priv_key, const unsigned char *ukm,
-    unsigned char *key)
+    unsigned int ukm_len, int ukm_be, int out_nid, unsigned char *key)
 {
 	unsigned char hashbuf[128];
+	size_t hash_len;
 	int digest_nid;
 	int ret = 0;
 	BN_CTX *ctx = BN_CTX_new();
@@ -331,7 +334,10 @@ gost01_VKO_key(EVP_PKEY *pub_key, EVP_PKEY *priv_key, const unsigned char *ukm,
 	if ((Y = BN_CTX_get(ctx)) == NULL)
 		goto err;
 
-	GOST_le2bn(ukm, 8, UKM);
+	if (ukm_be)
+		BN_bin2bn (ukm, ukm_len, UKM);
+	else
+		GOST_le2bn(ukm, ukm_len, UKM);
 
 	digest_nid = GOST_KEY_get_digest(priv_key->pkey.gost);
 	if (VKO_compute_key(X, Y, pub_key->pkey.gost, priv_key->pkey.gost,
@@ -340,27 +346,37 @@ gost01_VKO_key(EVP_PKEY *pub_key, EVP_PKEY *priv_key, const unsigned char *ukm,
 
 	switch (digest_nid) {
 	case NID_id_GostR3411_94_CryptoProParamSet:
-		GOST_bn2le(X, hashbuf, 32);
-		GOST_bn2le(Y, hashbuf + 32, 32);
-		GOSTR341194(hashbuf, 64, key, digest_nid);
-		ret = 1;
-		break;
 	case NID_id_tc26_gost3411_2012_256:
 		GOST_bn2le(X, hashbuf, 32);
 		GOST_bn2le(Y, hashbuf + 32, 32);
-		STREEBOG256(hashbuf, 64, key);
-		ret = 1;
+		hash_len = 64;
 		break;
 	case NID_id_tc26_gost3411_2012_512:
 		GOST_bn2le(X, hashbuf, 64);
 		GOST_bn2le(Y, hashbuf + 64, 64);
-		STREEBOG256(hashbuf, 128, key);
-		ret = 1;
+		hash_len = 128;
 		break;
 	default:
 		ret = -2;
-		break;
+		goto err;
 	}
+
+	switch (out_nid) {
+	case NID_id_GostR3411_94_CryptoProParamSet:
+		GOSTR341194(hashbuf, hash_len, key, out_nid);
+		break;
+	case NID_id_tc26_gost3411_2012_256:
+		STREEBOG256(hashbuf, hash_len, key);
+		break;
+	case NID_id_tc26_gost3411_2012_512:
+		STREEBOG512(hashbuf, hash_len, key);
+		break;
+	default:
+		ret = -2;
+		goto err;
+	}
+
+	ret = 1;
 err:
 	BN_CTX_end(ctx);
 	BN_CTX_free(ctx);
@@ -368,7 +384,7 @@ err:
 }
 
 int
-pkey_gost01_decrypt(EVP_PKEY_CTX *pctx, unsigned char *key, size_t *key_len,
+pkey_gost01_decrypt_4490(EVP_PKEY_CTX *pctx, unsigned char *key, size_t *key_len,
     const unsigned char *in, size_t in_len)
 {
 	const unsigned char *p = in;
@@ -428,8 +444,15 @@ pkey_gost01_decrypt(EVP_PKEY_CTX *pctx, unsigned char *key, size_t *key_len,
 		goto err;
 	}
 	memcpy(wrappedKey + 40, gkt->key_info->imit->data, 4);
-	if (gost01_VKO_key(peerkey, priv, wrappedKey, sharedKey) <= 0)
+	if (gost01_VKO_key(peerkey, priv, wrappedKey, 8, 0,
+			   GOST_KEY_get_digest(priv->pkey.gost) ==
+			   NID_id_GostR3411_94_CryptoProParamSet ?
+			   NID_id_GostR3411_94_CryptoProParamSet :
+			   NID_id_tc26_gost3411_2012_256,
+			   sharedKey) <= 0) {
+		GOSTerror(GOST_R_ERROR_COMPUTING_SHARED_KEY);
 		goto err;
+	}
 	if (gost_key_unwrap_crypto_pro(nid, sharedKey, wrappedKey, key) == 0) {
 		GOSTerror(GOST_R_ERROR_COMPUTING_SHARED_KEY);
 		goto err;
@@ -464,15 +487,22 @@ pkey_gost01_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
 		return 32;
 	}
 
-	if (gost01_VKO_key(peer_key, my_key, data->shared_ukm, key) <= 0)
+	if (gost01_VKO_key(peer_key, my_key, data->shared_ukm, 8, 0,
+			   GOST_KEY_get_digest(my_key->pkey.gost) ==
+			   NID_id_GostR3411_94_CryptoProParamSet ?
+			   NID_id_GostR3411_94_CryptoProParamSet :
+			   NID_id_tc26_gost3411_2012_256,
+			   key) <= 0) {
+		GOSTerror(GOST_R_ERROR_COMPUTING_SHARED_KEY);
 		return 0;
+	}
 
 	*keylen = 32;
 	return 1;
 }
 
 int
-pkey_gost01_encrypt(EVP_PKEY_CTX *pctx, unsigned char *out, size_t *out_len,
+pkey_gost01_encrypt_4490(EVP_PKEY_CTX *pctx, unsigned char *out, size_t *out_len,
     const unsigned char *key, size_t key_len)
 {
 	GOST_KEY_TRANSPORT *gkt = NULL;
@@ -484,7 +514,7 @@ pkey_gost01_encrypt(EVP_PKEY_CTX *pctx, unsigned char *out, size_t *out_len,
 	EVP_PKEY *sec_key = EVP_PKEY_CTX_get0_peerkey(pctx);
 	int nid = NID_id_Gost28147_89_CryptoPro_A_ParamSet;
 
-	if (data->shared_ukm != NULL) {
+	if (data->shared_ukm != NULL && data->shared_ukm_len >= 8) {
 		memcpy(ukm, data->shared_ukm, 8);
 	} else /* if (out != NULL) */ {
 		arc4random_buf(ukm, 8);
@@ -521,22 +551,29 @@ pkey_gost01_encrypt(EVP_PKEY_CTX *pctx, unsigned char *out, size_t *out_len,
 	}
 
 	if (out != NULL) {
-		if (gost01_VKO_key(pubk, sec_key, ukm, shared_key) <= 0)
+		if (gost01_VKO_key(pubk, sec_key, ukm, 8, 0,
+				   GOST_KEY_get_digest(pubk->pkey.gost) ==
+				   NID_id_GostR3411_94_CryptoProParamSet ?
+				   NID_id_GostR3411_94_CryptoProParamSet :
+				   NID_id_tc26_gost3411_2012_256,
+				   shared_key) <= 0) {
+			GOSTerror(GOST_R_ERROR_COMPUTING_SHARED_KEY);
 			goto err;
+		}
 		gost_key_wrap_crypto_pro(nid, shared_key, ukm, key,
 		    crypted_key);
 	}
 	gkt = GOST_KEY_TRANSPORT_new();
-	if (gkt == NULL)
+	if (gkt == NULL) {
+		GOSTerror(ERR_R_MALLOC_FAILURE);
 		goto err;
-	if (ASN1_OCTET_STRING_set(gkt->key_agreement_info->eph_iv, ukm, 8) == 0)
+	}
+	if (!ASN1_OCTET_STRING_set(gkt->key_agreement_info->eph_iv, ukm, 8) ||
+	    !ASN1_OCTET_STRING_set(gkt->key_info->imit, crypted_key + 40, 4) ||
+	    !ASN1_OCTET_STRING_set(gkt->key_info->encrypted_key, crypted_key + 8, 32)) {
+		GOSTerror(ERR_R_ASN1_LIB);
 		goto err;
-	if (ASN1_OCTET_STRING_set(gkt->key_info->imit, crypted_key + 40,
-	    4) == 0)
-		goto err;
-	if (ASN1_OCTET_STRING_set(gkt->key_info->encrypted_key, crypted_key + 8,
-	    32) == 0)
-		goto err;
+	}
 	if (key_is_ephemeral) {
 		if (X509_PUBKEY_set(&gkt->key_agreement_info->ephem_key,
 		    out != NULL ? sec_key : pubk) == 0) {
@@ -568,6 +605,213 @@ err:
 	return -1;
 }
 
+int
+pkey_gost01_decrypt_pskey(EVP_PKEY_CTX *pctx, unsigned char *key, size_t *key_len,
+    const unsigned char *in, size_t in_len,
+    const EVP_CIPHER *enc_cipher, const EVP_CIPHER *mac_cipher)
+{
+	const unsigned char *p = in;
+	EVP_PKEY *priv = EVP_PKEY_CTX_get0_pkey(pctx);
+	GOST_KEY_TRANSPORT_PSKEY *gkt = NULL;
+	struct gost_pmeth_data *data = EVP_PKEY_CTX_get_data(pctx);
+	EVP_PKEY *eph_key = NULL, *peerkey = NULL;
+	unsigned char keg_out[64];
+	const unsigned char *ukm;
+
+	if (key == NULL) {
+		*key_len = 32;
+		return 1;
+	}
+
+	gkt = d2i_GOST_KEY_TRANSPORT_PSKEY(NULL, (const unsigned char **)&p, in_len);
+	if (gkt == NULL) {
+		GOSTerror(GOST_R_ERROR_PARSING_KEY_TRANSPORT_INFO);
+		return -1;
+	}
+
+	if (data->shared_ukm_len == 0) {
+		if (!gkt->ukm || gkt->ukm->length != 32) {
+			GOSTerror(ERR_R_ASN1_LIB);
+			goto err;
+		}
+		ukm = gkt->ukm->data;
+	} else if (data->shared_ukm_len != 32) {
+		GOSTerror(GOST_R_INVALID_IV_LENGTH);
+		goto err;
+	} else {
+		ukm = data->shared_ukm;
+	}
+
+	eph_key = X509_PUBKEY_get(gkt->ephem_key);
+	if (eph_key == NULL) {
+		GOSTerror(GOST_R_ERROR_PARSING_KEY_TRANSPORT_INFO);
+		goto err;
+	}
+
+	if (EVP_PKEY_derive_set_peer(pctx, eph_key) <= 0) {
+		GOSTerror(GOST_R_INCOMPATIBLE_PEER_KEY);
+		goto err;
+	}
+
+	peerkey = EVP_PKEY_CTX_get0_peerkey(pctx);
+	if (peerkey == NULL) {
+		GOSTerror(GOST_R_NO_PEER_KEY);
+		goto err;
+	}
+
+	/* KEG */
+	if (!gost_keg(peerkey, priv, data->digest_nid, ukm, keg_out)) {
+			GOSTerror(GOST_R_ERROR_COMPUTING_SHARED_KEY);
+			goto err;
+	}
+
+	if (!gost_kimp15(enc_cipher, mac_cipher,
+		    gkt->key_exp->data, gkt->key_exp->length,
+		    keg_out, keg_out + 32,
+		    ukm + 24,
+		    key, key_len)) {
+		GOSTerror(GOST_R_ERROR_COMPUTING_SHARED_KEY);
+		goto err;
+	}
+
+	GOST_KEY_TRANSPORT_PSKEY_free(gkt);
+	return 1;
+
+err:
+	GOST_KEY_TRANSPORT_PSKEY_free(gkt);
+	return 0;
+}
+
+int
+pkey_gost01_encrypt_pskey(EVP_PKEY_CTX *pctx, unsigned char *out, size_t *out_len,
+    const unsigned char *key, size_t key_len,
+    const EVP_CIPHER *enc_cipher, const EVP_CIPHER *mac_cipher)
+{
+	GOST_KEY_TRANSPORT_PSKEY *gkt = NULL;
+	struct gost_pmeth_data *data = EVP_PKEY_CTX_get_data(pctx);
+	EVP_PKEY *pubk = EVP_PKEY_CTX_get0_pkey(pctx);
+	EVP_PKEY *sec_key = NULL;
+	GOST_KEY *tmp_key;
+	unsigned char ukm[32];
+	unsigned char keg_out[64];
+	unsigned char kexp_out[64];
+	size_t kexp_len = sizeof(kexp_out);
+	int tmp_len;
+
+	if (data->shared_ukm == NULL) {
+		arc4random_buf(ukm, sizeof(ukm));
+	} else if (data->shared_ukm_len != sizeof(ukm)) {
+		GOSTerror(GOST_R_INVALID_IV_LENGTH);
+		return 0;
+	} else {
+		memcpy(ukm, data->shared_ukm, sizeof(ukm));
+	}
+
+	if (out) {
+		sec_key = EVP_PKEY_new();
+		if (sec_key == NULL) {
+			GOSTerror(ERR_R_MALLOC_FAILURE);
+			goto err;
+		}
+
+		tmp_key = GOST_KEY_new();
+		if (tmp_key == NULL) {
+			GOSTerror(ERR_R_MALLOC_FAILURE);
+			goto err;
+		}
+
+		if (EVP_PKEY_assign(sec_key, EVP_PKEY_base_id(pubk), tmp_key) == 0) {
+			GOST_KEY_free(tmp_key);
+			goto err;
+		}
+		if (EVP_PKEY_copy_parameters(sec_key, pubk) == 0)
+			goto err;
+		if (gost2001_keygen(sec_key->pkey.gost) == 0)
+			goto err;
+
+		/* KEG */
+		if (!gost_keg(pubk, sec_key, data->digest_nid, ukm, keg_out)) {
+			GOSTerror(GOST_R_ERROR_COMPUTING_SHARED_KEY);
+			goto err;
+		}
+
+		if (!gost_kexp15(enc_cipher, mac_cipher,
+				 key, key_len,
+				 keg_out, keg_out + 32,
+				 ukm + 24,
+				 kexp_out, &kexp_len))
+			goto err;
+	} else {
+		kexp_len = key_len + EVP_CIPHER_block_size(mac_cipher);
+	}
+
+	gkt = GOST_KEY_TRANSPORT_PSKEY_new();
+	if (gkt == NULL)
+		goto err;
+
+	if (!ASN1_OCTET_STRING_set(gkt->key_exp, kexp_out, kexp_len) ||
+	    !X509_PUBKEY_set(&gkt->ephem_key, out ? sec_key : pubk))
+		goto err;
+
+	if (data->shared_ukm == NULL &&
+	    (((gkt->ukm = ASN1_OCTET_STRING_new()) == NULL) ||
+	     !ASN1_OCTET_STRING_set(gkt->ukm, ukm, sizeof(ukm))))
+		goto err;
+
+	tmp_len = i2d_GOST_KEY_TRANSPORT_PSKEY(gkt, NULL);
+	if (!out) {
+		*out_len = tmp_len;
+	} else {
+		if (*out_len < tmp_len)
+			goto err;
+		*out_len = i2d_GOST_KEY_TRANSPORT_PSKEY(gkt, &out);
+	}
+
+	EVP_PKEY_free(sec_key);
+	GOST_KEY_TRANSPORT_PSKEY_free(gkt);
+
+	return 1;
+err:
+	EVP_PKEY_free(sec_key);
+	GOST_KEY_TRANSPORT_PSKEY_free(gkt);
+	return 0;
+}
+
+int
+pkey_gost01_decrypt(EVP_PKEY_CTX *ctx, unsigned char *out, size_t *out_len,
+    const unsigned char *key, size_t key_len)
+{
+	struct gost_pmeth_data *pctx = EVP_PKEY_CTX_get_data(ctx);
+
+	switch (pctx->enc_format) {
+	case GOST_ENC_FORMAT_4490:
+		return pkey_gost01_decrypt_4490(ctx, out, out_len, key, key_len);
+	case GOST_ENC_FORMAT_PSKEY_MAGMA:
+		return pkey_gost01_decrypt_pskey(ctx, out, out_len, key, key_len, EVP_magma_ctr(), EVP_magma_cbc());
+	case GOST_ENC_FORMAT_PSKEY_KUZNYECHIK:
+		return pkey_gost01_decrypt_pskey(ctx, out, out_len, key, key_len, EVP_kuznyechik_ctr(), EVP_kuznyechik_cbc());
+	default:
+		return -1;
+	}
+}
+
+int
+pkey_gost01_encrypt(EVP_PKEY_CTX *ctx, unsigned char *out, size_t *out_len,
+    const unsigned char *key, size_t key_len)
+{
+	struct gost_pmeth_data *pctx = EVP_PKEY_CTX_get_data(ctx);
+
+	switch (pctx->enc_format) {
+	case GOST_ENC_FORMAT_4490:
+		return pkey_gost01_encrypt_4490(ctx, out, out_len, key, key_len);
+	case GOST_ENC_FORMAT_PSKEY_MAGMA:
+		return pkey_gost01_encrypt_pskey(ctx, out, out_len, key, key_len, EVP_magma_ctr(), EVP_magma_cbc());
+	case GOST_ENC_FORMAT_PSKEY_KUZNYECHIK:
+		return pkey_gost01_encrypt_pskey(ctx, out, out_len, key, key_len, EVP_kuznyechik_ctr(), EVP_kuznyechik_cbc());
+	default:
+		return -1;
+	}
+}
 
 static int
 pkey_gost01_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
@@ -604,6 +848,7 @@ pkey_gost01_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 		memcpy(ukm, p2, p1);
 		free(pctx->shared_ukm);
 		pctx->shared_ukm = ukm;
+		pctx->shared_ukm_len = p1;
 		return 1;
 	    }
 
@@ -631,6 +876,23 @@ pkey_gost01_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 	case EVP_PKEY_CTRL_GOST_GET_DIGEST:
 		*(int *)p2 = pctx->digest_nid;
 		return 1;
+	case EVP_PKEY_CTRL_GOST_ENC_FORMAT:
+		switch (p1) {
+		case GOST_ENC_FORMAT_4490:
+			/* All keys are supported */
+			break;
+		case GOST_ENC_FORMAT_PSKEY_MAGMA:
+		case GOST_ENC_FORMAT_PSKEY_KUZNYECHIK:
+			if (pctx->digest_nid != NID_id_tc26_gost3411_2012_256 &&
+			    pctx->digest_nid != NID_id_tc26_gost3411_2012_512)
+				return 0;
+			break;
+		default:
+			return 0;
+		}
+		pctx->enc_format = p1;
+		return 1;
+		break;
 	default:
 		return -2;
 	}

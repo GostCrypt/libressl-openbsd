@@ -474,4 +474,63 @@ gost3412_ctr_acpkm_get_asn1_params(EVP_CIPHER_CTX *ctx, ASN1_TYPE *params, unsig
 	return 1;
 }
 
+static const ASN1_TEMPLATE GOST_KEY_TRANSPORT_PSKEY_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(GOST_KEY_TRANSPORT_PSKEY, key_exp),
+		.field_name = "key_exp",
+		.item = &ASN1_OCTET_STRING_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(GOST_KEY_TRANSPORT_PSKEY, ephem_key),
+		.field_name = "ephem_key",
+		.item = &X509_PUBKEY_it,
+	},
+	{
+		.flags = ASN1_TFLG_OPTIONAL,
+		.tag = 0,
+		.offset = offsetof(GOST_KEY_TRANSPORT_PSKEY, ukm),
+		.field_name = "ukm",
+		.item = &ASN1_OCTET_STRING_it,
+	},
+};
+
+const ASN1_ITEM GOST_KEY_TRANSPORT_PSKEY_it = {
+	.itype = ASN1_ITYPE_NDEF_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = GOST_KEY_TRANSPORT_PSKEY_seq_tt,
+	.tcount = sizeof(GOST_KEY_TRANSPORT_PSKEY_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(GOST_KEY_TRANSPORT_PSKEY),
+	.sname = "GOST_KEY_TRANSPORT_PSKEY",
+};
+
+GOST_KEY_TRANSPORT_PSKEY *
+d2i_GOST_KEY_TRANSPORT_PSKEY(GOST_KEY_TRANSPORT_PSKEY **a, const unsigned char **in, long len)
+{
+	return (GOST_KEY_TRANSPORT_PSKEY *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
+	    &GOST_KEY_TRANSPORT_PSKEY_it);
+}
+
+int
+i2d_GOST_KEY_TRANSPORT_PSKEY(GOST_KEY_TRANSPORT_PSKEY *a, unsigned char **out)
+{
+	return ASN1_item_i2d((ASN1_VALUE *)a, out, &GOST_KEY_TRANSPORT_PSKEY_it);
+}
+
+GOST_KEY_TRANSPORT_PSKEY *
+GOST_KEY_TRANSPORT_PSKEY_new(void)
+{
+	return (GOST_KEY_TRANSPORT_PSKEY *)ASN1_item_new(&GOST_KEY_TRANSPORT_PSKEY_it);
+}
+
+void
+GOST_KEY_TRANSPORT_PSKEY_free(GOST_KEY_TRANSPORT_PSKEY *a)
+{
+	ASN1_item_free((ASN1_VALUE *)a, &GOST_KEY_TRANSPORT_PSKEY_it);
+}
+
 #endif

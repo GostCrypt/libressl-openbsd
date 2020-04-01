@@ -121,12 +121,29 @@ extern int VKO_compute_key(BIGNUM *X, BIGNUM *Y, const GOST_KEY *pkey,
     GOST_KEY *priv_key, const BIGNUM *ukm);
 extern BIGNUM *GOST_le2bn(const unsigned char *buf, size_t len, BIGNUM *bn);
 extern int GOST_bn2le(BIGNUM *bn, unsigned char *buf, int len);
+extern int gost01_VKO_key(EVP_PKEY *pub_key, EVP_PKEY *priv_key, const unsigned char *ukm,
+    unsigned int ukm_len, int ukm_be, int out_nid, unsigned char *key);
 
 /* GOST R 34.10 parameters */
 extern int GostR3410_get_md_digest(int nid);
 extern int GostR3410_get_pk_digest(int nid);
 extern int GostR3410_256_param_id(const char *value);
 extern int GostR3410_512_param_id(const char *value);
+
+int gost_keg(EVP_PKEY *pub, EVP_PKEY *priv, int nid,
+    const unsigned char *ukm, unsigned char *keg_out);
+int gost_kexp15(const EVP_CIPHER *cmac_cipher, const EVP_CIPHER *ctr_cipher,
+       const unsigned char *key, unsigned int key_length,
+       const unsigned char *key_mac,
+       const unsigned char *key_enc,
+       const unsigned char *iv,
+       unsigned char *out, size_t *out_length);
+int gost_kimp15(const EVP_CIPHER *cmac_cipher, const EVP_CIPHER *ctr_cipher,
+       const unsigned char *sexp, unsigned int sexp_length,
+       const unsigned char *key_mac,
+       const unsigned char *key_enc,
+       const unsigned char *iv,
+       unsigned char *out, size_t *out_length);
 
 __END_HIDDEN_DECLS
 
