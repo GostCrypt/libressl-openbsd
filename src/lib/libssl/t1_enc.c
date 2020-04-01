@@ -478,6 +478,10 @@ tls1_change_cipher_state_cipher(SSL *s, char is_read,
 		EVP_CIPHER_CTX_ctrl(cipher_ctx, EVP_CTRL_GOST_SET_SBOX, nid, 0);
 		if (S3I(s)->hs.new_cipher->algorithm_mac == SSL_GOST89MAC)
 			EVP_MD_CTX_ctrl(mac_ctx, EVP_MD_CTRL_GOST_SET_SBOX, nid, 0);
+	} else if (S3I(s)->hs.new_cipher->algorithm_enc == SSL_MAGMA_CTR_ACPKM) {
+		EVP_CIPHER_CTX_ctrl(cipher_ctx, EVP_CTRL_GOST_SET_MESHING, 1024, 0);
+	} else if (S3I(s)->hs.new_cipher->algorithm_enc == SSL_KUZNYECHIK_CTR_ACPKM) {
+		EVP_CIPHER_CTX_ctrl(cipher_ctx, EVP_CTRL_GOST_SET_MESHING, 4096, 0);
 	}
 
 	return (1);
