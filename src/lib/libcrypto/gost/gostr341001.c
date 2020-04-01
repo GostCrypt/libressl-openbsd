@@ -329,7 +329,7 @@ int
 VKO_compute_key(BIGNUM *X, BIGNUM *Y, const GOST_KEY *pkey, GOST_KEY *priv_key,
     const BIGNUM *ukm)
 {
-	BIGNUM *p = NULL, *order = NULL;
+	BIGNUM *p = NULL, *order = NULL, *cofactor = NULL;
 	const BIGNUM *key = GOST_KEY_get0_private_key(priv_key);
 	const EC_GROUP *group = GOST_KEY_get0_group(priv_key);
 	const EC_POINT *pub_key = GOST_KEY_get0_public_key(pkey);
@@ -350,7 +350,13 @@ VKO_compute_key(BIGNUM *X, BIGNUM *Y, const GOST_KEY *pkey, GOST_KEY *priv_key,
 		goto err;
 	if (EC_GROUP_get_order(group, order, ctx) == 0)
 		goto err;
-	if (BN_mod_mul(p, key, ukm, order, ctx) == 0)
+	if ((cofactor = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if (EC_GROUP_get_cofactor(group, cofactor, ctx) == 0)
+		goto err;
+	if (BN_mod_mul(p, key, cofactor, order, ctx) == 0)
+		goto err;
+	if (!BN_is_zero(ukm) && BN_mod_mul(p, p, ukm, order, ctx) == 0)
 		goto err;
 	if (EC_POINT_mul(group, pnt, NULL, pub_key, p, ctx) == 0)
 		goto err;
