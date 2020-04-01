@@ -1388,7 +1388,7 @@ ssl3_do_change_cipher_spec(SSL *s)
 	}
 
 	i = tls1_final_finish_mac(s, sender, slen,
-	    S3I(s)->tmp.peer_finish_md);
+	    S3I(s)->tmp.peer_finish_md, sizeof(S3I(s)->tmp.peer_finish_md));
 	if (i == 0) {
 		SSLerror(s, ERR_R_INTERNAL_ERROR);
 		return 0;

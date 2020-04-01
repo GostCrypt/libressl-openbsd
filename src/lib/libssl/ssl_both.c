@@ -175,9 +175,12 @@ ssl3_send_finished(SSL *s, int a, int b, const char *sender, int slen)
 		md_len = TLS1_FINISH_MAC_LENGTH;
 		OPENSSL_assert(md_len <= EVP_MAX_MD_SIZE);
 
-		if (tls1_final_finish_mac(s, sender, slen,
-		    S3I(s)->tmp.finish_md) != md_len)
+		md_len = tls1_final_finish_mac(s, sender, slen,
+		    S3I(s)->tmp.finish_md, sizeof(S3I(s)->tmp.finish_md));
+		if (md_len == 0) {
+			SSLerror(s, ERR_R_INTERNAL_ERROR);
 			return (0);
+		}
 		S3I(s)->tmp.finish_md_len = md_len;
 
 		/* Copy finished so we can use it for renegotiation checks. */
@@ -237,7 +240,7 @@ ssl3_take_mac(SSL *s)
 
 	S3I(s)->tmp.peer_finish_md_len =
 	    tls1_final_finish_mac(s, sender, slen,
-		S3I(s)->tmp.peer_finish_md);
+		S3I(s)->tmp.peer_finish_md, sizeof(S3I(s)->tmp.peer_finish_md));
 }
 
 int
@@ -260,8 +263,6 @@ ssl3_get_finished(SSL *s, int a, int b)
 	}
 	S3I(s)->change_cipher_spec = 0;
 
-	md_len = TLS1_FINISH_MAC_LENGTH;
-
 	if (n < 0) {
 		al = SSL_AD_DECODE_ERROR;
 		SSLerror(s, SSL_R_BAD_DIGEST_LENGTH);
@@ -270,14 +271,15 @@ ssl3_get_finished(SSL *s, int a, int b)
 
 	CBS_init(&cbs, s->internal->init_msg, n);
 
-	if (S3I(s)->tmp.peer_finish_md_len != md_len ||
-	    CBS_len(&cbs) != md_len) {
+	md_len = S3I(s)->tmp.peer_finish_md_len;
+
+	if (CBS_len(&cbs) != md_len) {
 		al = SSL_AD_DECODE_ERROR;
 		SSLerror(s, SSL_R_BAD_DIGEST_LENGTH);
 		goto f_err;
 	}
 
-	if (!CBS_mem_equal(&cbs, S3I(s)->tmp.peer_finish_md, CBS_len(&cbs))) {
+	if (!CBS_mem_equal(&cbs, S3I(s)->tmp.peer_finish_md, md_len)) {
 		al = SSL_AD_DECRYPT_ERROR;
 		SSLerror(s, SSL_R_DIGEST_CHECK_FAILED);
 		goto f_err;

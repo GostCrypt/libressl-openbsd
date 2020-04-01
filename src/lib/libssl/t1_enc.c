@@ -926,12 +926,19 @@ tls1_enc(SSL *s, int send)
 }
 
 int
-tls1_final_finish_mac(SSL *s, const char *str, int str_len, unsigned char *out)
+tls1_final_finish_mac(SSL *s, const char *str, int str_len, unsigned char *out, unsigned int outlen)
 {
 	unsigned char buf[EVP_MAX_MD_SIZE];
 	size_t hash_len;
+	int finished_len = TLS1_FINISH_MAC_LENGTH;
 
 	if (str_len < 0)
+		return 0;
+
+	if (S3I(s)->hs.new_cipher->algorithm_mkey == SSL_kGOST_KDF)
+		finished_len = 32;
+
+	if (finished_len > outlen)
 		return 0;
 
 	if (!tls1_transcript_hash_value(s, buf, sizeof(buf), &hash_len))
@@ -939,10 +946,10 @@ tls1_final_finish_mac(SSL *s, const char *str, int str_len, unsigned char *out)
 
 	if (!tls1_PRF(s, s->session->master_key, s->session->master_key_length,
 	    str, str_len, buf, hash_len, NULL, 0, NULL, 0, NULL, 0,
-	    out, TLS1_FINISH_MAC_LENGTH))
+	    out, finished_len))
 		return 0;
 
-	return TLS1_FINISH_MAC_LENGTH;
+	return finished_len;
 }
 
 int
