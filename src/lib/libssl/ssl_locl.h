@@ -743,6 +743,7 @@ typedef struct ssl_internal_st {
 
 	EVP_CIPHER_CTX *enc_write_ctx;		/* cryptographic state */
 	EVP_MD_CTX *write_hash;			/* used for mac generation */
+	int write_mac_size;
 
 	/* session info */
 

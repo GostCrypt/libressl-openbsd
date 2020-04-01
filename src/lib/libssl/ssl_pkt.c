@@ -443,12 +443,12 @@ ssl3_get_record(SSL *s)
 
 	/* r->length is now the compressed data plus mac */
 	if ((sess != NULL) && (s->enc_read_ctx != NULL) &&
-	    (EVP_MD_CTX_md(s->read_hash) != NULL)) {
+	    (s->read_mac_size != 0)) {
 		/* s->read_hash != NULL => mac_size != -1 */
 		unsigned char *mac = NULL;
 		unsigned char mac_tmp[EVP_MAX_MD_SIZE];
 
-		mac_size = EVP_MD_CTX_size(s->read_hash);
+		mac_size = s->read_mac_size;
 		OPENSSL_assert(mac_size <= EVP_MAX_MD_SIZE);
 
 		orig_len = rr->length + rr->padding_length;
@@ -628,13 +628,10 @@ ssl3_create_record(SSL *s, unsigned char *p, int type, const unsigned char *buf,
 
 	memset(&cbb, 0, sizeof(cbb));
 
-	if ((sess == NULL) || (s->internal->enc_write_ctx == NULL) ||
-	    (EVP_MD_CTX_md(s->internal->write_hash) == NULL)) {
+	if ((sess == NULL) || (s->internal->enc_write_ctx == NULL)) {
 		mac_size = 0;
 	} else {
-		mac_size = EVP_MD_CTX_size(s->internal->write_hash);
-		if (mac_size < 0)
-			goto err;
+		mac_size = s->internal->write_mac_size;
 	}
 
 	/*

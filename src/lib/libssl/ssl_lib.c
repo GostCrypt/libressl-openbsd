@@ -2538,6 +2538,7 @@ ssl_clear_cipher_read_state(SSL *s)
 	s->enc_read_ctx = NULL;
 	EVP_MD_CTX_free(s->read_hash);
 	s->read_hash = NULL;
+	s->read_mac_size = 0;
 
 	if (s->internal->aead_read_ctx != NULL) {
 		EVP_AEAD_CTX_cleanup(&s->internal->aead_read_ctx->ctx);
@@ -2553,6 +2554,7 @@ ssl_clear_cipher_write_state(SSL *s)
 	s->internal->enc_write_ctx = NULL;
 	EVP_MD_CTX_free(s->internal->write_hash);
 	s->internal->write_hash = NULL;
+	s->internal->write_mac_size = 0;
 
 	if (s->internal->aead_write_ctx != NULL) {
 		EVP_AEAD_CTX_cleanup(&s->internal->aead_write_ctx->ctx);

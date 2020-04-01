@@ -407,6 +407,7 @@ tls1_change_cipher_state_cipher(SSL *s, char is_read,
 	const EVP_CIPHER *cipher;
 	EVP_MD_CTX *mac_ctx;
 	EVP_PKEY *mac_key;
+	int mac_size;
 	const EVP_MD *mac;
 	const EVP_CIPHER *mac_cipher;
 	int mac_type;
@@ -459,14 +460,20 @@ tls1_change_cipher_state_cipher(SSL *s, char is_read,
 	if (mac_type == EVP_PKEY_CMAC) {
 		mac_key = EVP_PKEY_new_CMAC_key(NULL, mac_secret,
 				mac_secret_size, mac_cipher);
+		mac_size = EVP_CIPHER_block_size(mac_cipher);
 	} else {
 		mac_key = EVP_PKEY_new_mac_key(mac_type, NULL, mac_secret,
 				mac_secret_size);
+		mac_size = EVP_MD_size(mac);
 	}
 	if (mac_key  == NULL)
 		goto err;
 	EVP_DigestSignInit(mac_ctx, NULL, mac, NULL, mac_key);
 	EVP_PKEY_free(mac_key);
+	if (is_read)
+		s->read_mac_size = mac_size;
+	else
+		s->internal->write_mac_size = mac_size;
 
 	if (S3I(s)->hs.new_cipher->algorithm_enc == SSL_eGOST2814789CNT) {
 		int nid;
@@ -846,10 +853,7 @@ tls1_enc(SSL *s, int send)
 	}
 
 	if (send) {
-		if (EVP_MD_CTX_md(s->internal->write_hash)) {
-			int n = EVP_MD_CTX_size(s->internal->write_hash);
-			OPENSSL_assert(n >= 0);
-		}
+		OPENSSL_assert(s->internal->write_mac_size >= 0);
 		ds = s->internal->enc_write_ctx;
 		if (s->internal->enc_write_ctx == NULL)
 			enc = NULL;
@@ -874,10 +878,7 @@ tls1_enc(SSL *s, int send)
 			}
 		}
 	} else {
-		if (EVP_MD_CTX_md(s->read_hash)) {
-			int n = EVP_MD_CTX_size(s->read_hash);
-			OPENSSL_assert(n >= 0);
-		}
+		OPENSSL_assert(s->read_mac_size >= 0);
 		ds = s->enc_read_ctx;
 		if (s->enc_read_ctx == NULL)
 			enc = NULL;
@@ -917,8 +918,7 @@ tls1_enc(SSL *s, int send)
 			return -1;	/* AEAD can fail to verify MAC */
 
 		ret = 1;
-		if (EVP_MD_CTX_md(s->read_hash) != NULL)
-			mac_size = EVP_MD_CTX_size(s->read_hash);
+		mac_size = s->read_mac_size;
 		if ((bs != 1) && !send)
 			ret = tls1_cbc_remove_padding(s, rec, bs, mac_size);
 	}
@@ -970,13 +970,14 @@ tls1_mac(SSL *ssl, unsigned char *md, int send)
 		rec = &(ssl->s3->internal->wrec);
 		seq = &(ssl->s3->internal->write_sequence[0]);
 		hash = ssl->internal->write_hash;
+		t = ssl->internal->write_mac_size;
 	} else {
 		rec = &(ssl->s3->internal->rrec);
 		seq = &(ssl->s3->internal->read_sequence[0]);
 		hash = ssl->read_hash;
+		t = ssl->read_mac_size;
 	}
 
-	t = EVP_MD_CTX_size(hash);
 	OPENSSL_assert(t >= 0);
 	md_size = t;
 
