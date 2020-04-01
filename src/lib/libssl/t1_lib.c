@@ -1034,3 +1034,45 @@ tls_decrypt_ticket(SSL *s, CBS *session_id, CBS *ticket, SSL_SESSION **psess)
 
 	return ret;
 }
+
+/*
+ * Compute shared IV and store it in algorithm-specific context data.
+ */
+int
+tls1_set_gost_ukm(SSL *s, EVP_PKEY_CTX *pkey_ctx, unsigned int psexp)
+{
+	unsigned char shared_ukm[32];
+	unsigned int md_len;
+	EVP_MD_CTX *ukm_hash;
+	int nid;
+
+	ukm_hash = EVP_MD_CTX_new();
+	if (ukm_hash == NULL) {
+		SSLerror(s, ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
+
+	if (ssl_get_algorithm2(s) & SSL_HANDSHAKE_MAC_GOST94)
+		nid = NID_id_GostR3411_94;
+	else
+		nid = NID_id_tc26_gost3411_2012_256;
+	if (!EVP_DigestInit(ukm_hash, EVP_get_digestbynid(nid)) ||
+	    !EVP_DigestUpdate(ukm_hash, s->s3->client_random, SSL3_RANDOM_SIZE) ||
+	    !EVP_DigestUpdate(ukm_hash, s->s3->server_random, SSL3_RANDOM_SIZE) ||
+	    !EVP_DigestFinal_ex(ukm_hash, shared_ukm, &md_len)) {
+		SSLerror(s, ERR_R_EVP_LIB);
+		goto err;
+	}
+
+	if (EVP_PKEY_CTX_ctrl(pkey_ctx, -1, -1,
+	    EVP_PKEY_CTRL_SET_IV, psexp ? md_len : 8, shared_ukm) < 0) {
+		SSLerror(s, SSL_R_LIBRARY_BUG);
+		goto err;
+	}
+	EVP_MD_CTX_free(ukm_hash);
+	return 1;
+
+err:
+	EVP_MD_CTX_free(ukm_hash);
+	return 0;
+}

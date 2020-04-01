@@ -631,7 +631,7 @@ ssl_cipher_get_disabled(unsigned long *mkey, unsigned long *auth,
 	 */
 	if (EVP_PKEY_meth_find(NID_id_GostR3410_2001) == NULL) {
 		*auth |= SSL_aGOST01;
-		*mkey |= SSL_kGOST;
+		*mkey |= SSL_kGOST | SSL_kGOST_KDF;
 	}
 
 #ifdef SSL_FORBID_ENULL

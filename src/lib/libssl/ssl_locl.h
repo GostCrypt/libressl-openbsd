@@ -1371,6 +1371,8 @@ int ssl_check_serverhello_tlsext(SSL *s);
 int tls1_process_ticket(SSL *s, CBS *session_id, CBS *ext_block,
     SSL_SESSION **ret);
 
+int tls1_set_gost_ukm(SSL *s, EVP_PKEY_CTX *pkey_ctx, unsigned int psexp);
+
 long ssl_get_algorithm2(SSL *s);
 
 int tls1_check_ec_server_key(SSL *s);

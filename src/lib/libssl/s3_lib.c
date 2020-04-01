@@ -2600,6 +2600,8 @@ ssl3_get_req_cert_types(SSL *s, CBB *cbb)
 	if ((alg_k & SSL_kGOST) != 0) {
 		if (!CBB_add_u8(cbb, TLS_CT_GOST01_SIGN))
 			return 0;
+	}
+	if (((alg_k & SSL_kGOST) != 0) || ((alg_k & SSL_kGOST_KDF) != 0)) {
 		if (!CBB_add_u8(cbb, TLS_CT_GOST12_256_SIGN))
 			return 0;
 		if (!CBB_add_u8(cbb, TLS_CT_GOST12_512_SIGN))
