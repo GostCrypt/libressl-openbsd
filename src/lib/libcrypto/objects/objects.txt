@@ -1436,6 +1436,7 @@ tc26 1 7 2 1		: id-tc26-wrap-gostr3412-2015-kuznyechik-kexp15
 			: KxECDHE		: kx-ecdhe
 			: KxDHE			: kx-dhe
 			: KxGOST		: kx-gost
+			: KxGOSTKDF		: kx-gost-kdf
 
 # TLS cipher suite authentication
 			: AuthRSA		: auth-rsa
