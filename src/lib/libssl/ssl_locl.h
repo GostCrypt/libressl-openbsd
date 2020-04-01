@@ -880,7 +880,8 @@ typedef struct ssl3_state_internal_st {
 		/* actually only needs to be 16+20 */
 		unsigned char cert_verify_md[EVP_MAX_MD_SIZE*2];
 
-		/* actually only need to be 16+20 for SSLv3 and 12 for TLS */
+		/* actually only need to be 16+20 for SSLv3 and 12 for TLS
+		 * 32 for GOST CTR-OMAC ciphersuites */
 		unsigned char finish_md[EVP_MAX_MD_SIZE*2];
 		int finish_md_len;
 		unsigned char peer_finish_md[EVP_MAX_MD_SIZE*2];
@@ -1343,7 +1344,7 @@ void tls1_cleanup_key_block(SSL *s);
 int tls1_change_cipher_state(SSL *s, int which);
 int tls1_setup_key_block(SSL *s);
 int tls1_enc(SSL *s, int snd);
-int tls1_final_finish_mac(SSL *s, const char *str, int slen, unsigned char *p);
+int tls1_final_finish_mac(SSL *s, const char *str, int str_len, unsigned char *out, unsigned int outlen);
 int tls1_mac(SSL *ssl, unsigned char *md, int snd);
 int tls1_generate_master_secret(SSL *s, unsigned char *out,
     unsigned char *p, int len);
