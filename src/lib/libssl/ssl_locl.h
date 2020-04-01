@@ -206,6 +206,7 @@ __BEGIN_HIDDEN_DECLS
 #define SSL_kECDHE		0x00000080L /* ephemeral ECDH */
 #define SSL_kGOST		0x00000200L /* GOST key exchange */
 #define SSL_kTLS1_3		0x00000400L /* TLSv1.3 key exchange */
+#define SSL_kGOST_KDF		0x00000800L /* GOST KDF key exchange */
 
 /* Bits for algorithm_auth (server authentication) */
 #define SSL_aRSA		0x00000001L /* RSA auth */
@@ -229,6 +230,8 @@ __BEGIN_HIDDEN_DECLS
 #define SSL_AES128GCM		0x00000400L
 #define SSL_AES256GCM		0x00000800L
 #define SSL_CHACHA20POLY1305	0x00001000L
+#define SSL_KUZNYECHIK_CTR_ACPKM	0x00002000L
+#define SSL_MAGMA_CTR_ACPKM	0x00004000L
 
 #define SSL_AES        		(SSL_AES128|SSL_AES256|SSL_AES128GCM|SSL_AES256GCM)
 #define SSL_CAMELLIA		(SSL_CAMELLIA128|SSL_CAMELLIA256)
@@ -245,6 +248,8 @@ __BEGIN_HIDDEN_DECLS
 /* Not a real MAC, just an indication it is part of cipher */
 #define SSL_AEAD		0x00000040L
 #define SSL_STREEBOG256		0x00000080L
+#define SSL_KUZNYECHIK_OMAC	0x00000100L
+#define SSL_MAGMA_OMAC		0x00000200L
 
 /* Bits for algorithm_ssl (protocol version) */
 #define SSL_SSLV3		0x00000002L

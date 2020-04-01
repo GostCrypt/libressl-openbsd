@@ -219,6 +219,11 @@ static const SSL_CIPHER cipher_aliases[] = {
 		.algorithm_mkey = SSL_kGOST,
 	},
 
+	{
+		.name = SSL_TXT_kGOST_KDF,
+		.algorithm_mkey = SSL_kGOST_KDF,
+	},
+
 	/* server authentication aliases */
 	{
 		.name = SSL_TXT_aRSA,
@@ -364,6 +369,14 @@ static const SSL_CIPHER cipher_aliases[] = {
 	{
 		.name = SSL_TXT_GOST89MAC,
 		.algorithm_mac = SSL_GOST89MAC,
+	},
+	{
+		.name = SSL_TXT_KUZNYECHIK_OMAC,
+		.algorithm_mac = SSL_KUZNYECHIK_OMAC,
+	},
+	{
+		.name = SSL_TXT_MAGMA_OMAC,
+		.algorithm_mac = SSL_MAGMA_OMAC,
 	},
 	{
 		.name = SSL_TXT_SHA256,
@@ -1424,6 +1437,9 @@ SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 	case SSL_kGOST:
 		kx = "GOST";
 		break;
+	case SSL_kGOST_KDF:
+		kx = "GOSTKDF";
+		break;
 	case SSL_kTLS1_3:
 		kx = "TLSv1.3";
 		break;
@@ -1489,6 +1505,12 @@ SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 	case SSL_eGOST2814789CNT:
 		enc = "GOST-28178-89-CNT";
 		break;
+	case SSL_KUZNYECHIK_CTR_ACPKM:
+		enc = "KUZNYECHIK-CTR-ACPKM";
+		break;
+	case SSL_MAGMA_CTR_ACPKM:
+		enc = "MAGMA-CTR-ACPKM";
+		break;
 	default:
 		enc = "unknown";
 		break;
@@ -1518,6 +1540,12 @@ SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 		break;
 	case SSL_STREEBOG256:
 		mac = "STREEBOG256";
+		break;
+	case SSL_KUZNYECHIK_OMAC:
+		mac = "KUZNYECHIK-OMAC";
+		break;
+	case SSL_MAGMA_OMAC:
+		mac = "MAGMA-OMAC";
 		break;
 	default:
 		mac = "unknown";
@@ -1613,6 +1641,10 @@ SSL_CIPHER_get_cipher_nid(const SSL_CIPHER *c)
 		return NID_rc4;
 	case SSL_eGOST2814789CNT:
 		return NID_gost89_cnt;
+	case SSL_KUZNYECHIK_CTR_ACPKM:
+		return NID_id_tc26_cipher_gostr3412_2015_kuznyechik_ctracpkm;
+	case SSL_MAGMA_CTR_ACPKM:
+		return NID_id_tc26_cipher_gostr3412_2015_magma_ctracpkm;
 	default:
 		return NID_undef;
 	}
@@ -1638,6 +1670,10 @@ SSL_CIPHER_get_digest_nid(const SSL_CIPHER *c)
 		return NID_sha384;
 	case SSL_STREEBOG256:
 		return NID_id_tc26_gost3411_2012_256;
+	case SSL_KUZNYECHIK_OMAC:
+		return NID_kuznyechik_mac;
+	case SSL_MAGMA_OMAC:
+		return NID_magma_mac;
 	default:
 		return NID_undef;
 	}
@@ -1653,6 +1689,8 @@ SSL_CIPHER_get_kx_nid(const SSL_CIPHER *c)
 		return NID_kx_ecdhe;
 	case SSL_kGOST:
 		return NID_kx_gost;
+	case SSL_kGOST_KDF:
+		return NID_kx_gost_kdf;
 	case SSL_kRSA:
 		return NID_kx_rsa;
 	default:

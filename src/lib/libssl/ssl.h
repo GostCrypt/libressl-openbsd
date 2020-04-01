@@ -246,6 +246,7 @@ extern "C" {
 #define SSL_TXT_kEECDH		"kEECDH"
 #define SSL_TXT_kPSK            "kPSK"
 #define SSL_TXT_kGOST		"kGOST"
+#define SSL_TXT_kGOST_KDF	"kGOSTKDF"
 #define SSL_TXT_kSRP		"kSRP"
 
 #define	SSL_TXT_aRSA		"aRSA"
@@ -299,6 +300,8 @@ extern "C" {
 #define SSL_TXT_SHA384		"SHA384"
 #define SSL_TXT_STREEBOG256		"STREEBOG256"
 #define SSL_TXT_STREEBOG512		"STREEBOG512"
+#define SSL_TXT_KUZNYECHIK_OMAC	"KUZNYECHIK-OMAC"
+#define SSL_TXT_MAGMA_OMAC	"MAGMA-OMAC"
 
 #define SSL_TXT_DTLS1		"DTLSv1"
 #define SSL_TXT_SSLV2		"SSLv2"

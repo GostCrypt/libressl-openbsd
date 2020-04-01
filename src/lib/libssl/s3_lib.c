@@ -1305,6 +1305,38 @@ SSL_CIPHER ssl3_ciphers[] = {
 		.alg_bits = 256,
 	},
 
+	/* Cipher C100 */
+	{
+		.valid = 1,
+		.name = "GOST2012256-KUZNYECHIK-CTR-OMAC",
+		.id = 0x300c100,
+		.algorithm_mkey = SSL_kGOST_KDF,
+		.algorithm_auth = SSL_aGOST01,
+		.algorithm_enc = SSL_KUZNYECHIK_CTR_ACPKM,
+		.algorithm_mac = SSL_KUZNYECHIK_OMAC,
+		.algorithm_ssl = SSL_TLSV1_2,
+		.algo_strength = SSL_HIGH,
+		.algorithm2 = SSL_HANDSHAKE_MAC_STREEBOG256|TLS1_PRF_STREEBOG256,
+		.strength_bits = 256,
+		.alg_bits = 256
+	},
+
+	/* Cipher C101 */
+	{
+		.valid = 1,
+		.name = "GOST2012256-MAGMA-CTR-OMAC",
+		.id = 0x300c101,
+		.algorithm_mkey = SSL_kGOST_KDF,
+		.algorithm_auth = SSL_aGOST01,
+		.algorithm_enc = SSL_MAGMA_CTR_ACPKM,
+		.algorithm_mac = SSL_MAGMA_OMAC,
+		.algorithm_ssl = SSL_TLSV1_2,
+		.algo_strength = SSL_HIGH,
+		.algorithm2 = SSL_HANDSHAKE_MAC_STREEBOG256|TLS1_PRF_STREEBOG256,
+		.strength_bits = 256,
+		.alg_bits = 256
+	},
+
 	/* Cipher C102 */
 	{
 		.valid = 1,
