@@ -121,6 +121,9 @@ GOST_CIPHER_PARAMS *d2i_GOST_CIPHER_PARAMS(GOST_CIPHER_PARAMS **a, const unsigne
 int i2d_GOST_CIPHER_PARAMS(GOST_CIPHER_PARAMS *a, unsigned char **out);
 extern const ASN1_ITEM GOST_CIPHER_PARAMS_it;
 
+int gost3412_ctr_acpkm_set_asn1_params(EVP_CIPHER_CTX *ctx, ASN1_TYPE *params, unsigned int il);
+int gost3412_ctr_acpkm_get_asn1_params(EVP_CIPHER_CTX *ctx, ASN1_TYPE *params, unsigned int il);
+
 #define GOST2814789IMIT_LENGTH 4
 #define GOST2814789IMIT_CBLOCK 8
 #define GOST2814789IMIT_LONG unsigned int

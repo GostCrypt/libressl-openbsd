@@ -10,9 +10,12 @@
 #include <openssl/opensslconf.h>
 
 #ifndef OPENSSL_NO_GOST
+#include <string.h>
+
 #include <openssl/asn1t.h>
 #include <openssl/x509.h>
 #include <openssl/gost.h>
+#include <openssl/err.h>
 
 #include "gost_locl.h"
 #include "gost_asn1.h"
@@ -342,6 +345,133 @@ void
 GOST_CIPHER_PARAMS_free(GOST_CIPHER_PARAMS *a)
 {
 	ASN1_item_free((ASN1_VALUE *)a, &GOST_CIPHER_PARAMS_it);
+}
+
+static const ASN1_TEMPLATE GOST3412_ENCRYPTION_PARAMS_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(GOST3412_ENCRYPTION_PARAMS, iv),
+		.field_name = "iv",
+		.item = &ASN1_OCTET_STRING_it,
+	},
+};
+
+const ASN1_ITEM GOST3412_ENCRYPTION_PARAMS_it = {
+	.itype = ASN1_ITYPE_NDEF_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = GOST3412_ENCRYPTION_PARAMS_seq_tt,
+	.tcount = sizeof(GOST3412_ENCRYPTION_PARAMS_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(GOST3412_ENCRYPTION_PARAMS),
+	.sname = "GOST3412_ENCRYPTION_PARAMS",
+};
+
+GOST3412_ENCRYPTION_PARAMS *
+d2i_GOST3412_ENCRYPTION_PARAMS(GOST3412_ENCRYPTION_PARAMS **a, const unsigned char **in, long len)
+{
+	return (GOST3412_ENCRYPTION_PARAMS *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
+	    &GOST3412_ENCRYPTION_PARAMS_it);
+}
+
+int
+i2d_GOST3412_ENCRYPTION_PARAMS(GOST3412_ENCRYPTION_PARAMS *a, unsigned char **out)
+{
+	return ASN1_item_i2d((ASN1_VALUE *)a, out, &GOST3412_ENCRYPTION_PARAMS_it);
+}
+
+GOST3412_ENCRYPTION_PARAMS *
+GOST3412_ENCRYPTION_PARAMS_new(void)
+{
+	return (GOST3412_ENCRYPTION_PARAMS *)ASN1_item_new(&GOST3412_ENCRYPTION_PARAMS_it);
+}
+
+void
+GOST3412_ENCRYPTION_PARAMS_free(GOST3412_ENCRYPTION_PARAMS *a)
+{
+	ASN1_item_free((ASN1_VALUE *)a, &GOST3412_ENCRYPTION_PARAMS_it);
+}
+
+int
+gost3412_ctr_acpkm_set_asn1_params(EVP_CIPHER_CTX *ctx, ASN1_TYPE *params, unsigned int il)
+{
+	int len = 0;
+	unsigned char *buf = NULL;
+	unsigned char *p = NULL;
+	GOST3412_ENCRYPTION_PARAMS *gcp = NULL;
+	ASN1_OCTET_STRING *os = NULL;
+
+	if (params == NULL)
+		return 0;
+
+	gcp = GOST3412_ENCRYPTION_PARAMS_new();
+	if (ASN1_OCTET_STRING_set(gcp->iv, NULL, il + 8) == 0) {
+		GOST3412_ENCRYPTION_PARAMS_free(gcp);
+		GOSTerror(ERR_R_ASN1_LIB);
+		return 0;
+	}
+
+	memcpy(gcp->iv->data, ctx->iv, il);
+	memcpy(gcp->iv->data + il, ctx->oiv, 8);
+
+	len = i2d_GOST3412_ENCRYPTION_PARAMS(gcp, NULL);
+	p = buf = malloc(len);
+	if (buf == NULL) {
+		GOST3412_ENCRYPTION_PARAMS_free(gcp);
+		GOSTerror(ERR_R_MALLOC_FAILURE);
+		return 0;
+	}
+	i2d_GOST3412_ENCRYPTION_PARAMS(gcp, &p);
+	GOST3412_ENCRYPTION_PARAMS_free(gcp);
+
+	os = ASN1_OCTET_STRING_new();
+	if (os == NULL) {
+		free(buf);
+		GOSTerror(ERR_R_MALLOC_FAILURE);
+		return 0;
+	}
+	if (ASN1_OCTET_STRING_set(os, buf, len) == 0) {
+		ASN1_OCTET_STRING_free(os);
+		free(buf);
+		GOSTerror(ERR_R_ASN1_LIB);
+		return 0;
+	}
+	free(buf);
+
+	ASN1_TYPE_set(params, V_ASN1_SEQUENCE, os);
+
+	return 1;
+}
+
+int
+gost3412_ctr_acpkm_get_asn1_params(EVP_CIPHER_CTX *ctx, ASN1_TYPE *params, unsigned int il)
+{
+	int len;
+	GOST3412_ENCRYPTION_PARAMS *gcp = NULL;
+	unsigned char *p;
+
+	if (ASN1_TYPE_get(params) != V_ASN1_SEQUENCE)
+		return -1;
+
+	p = params->value.sequence->data;
+
+	gcp = d2i_GOST3412_ENCRYPTION_PARAMS(NULL, (const unsigned char **)&p,
+	    params->value.sequence->length);
+
+	len = gcp->iv->length;
+	if (len != il + 8 || len > sizeof(ctx->iv)) {
+		GOST3412_ENCRYPTION_PARAMS_free(gcp);
+		GOSTerror(GOST_R_INVALID_IV_LENGTH);
+		return -1;
+	}
+
+	memcpy(ctx->iv, gcp->iv->data, il);
+	memset(ctx->iv + il, 0, EVP_MAX_IV_LENGTH - il);
+	memcpy(ctx->oiv, gcp->iv->data + il, 8);
+
+	GOST3412_ENCRYPTION_PARAMS_free(gcp);
+
+	return 1;
 }
 
 #endif
