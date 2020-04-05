@@ -193,6 +193,41 @@ err:
 	return params;
 }
 
+static ASN1_STRING *
+encode_gost01_kexp_params(EVP_PKEY *pkey)
+{
+	int digest = GOST_KEY_get_digest(pkey->pkey.gost);
+	ASN1_STRING *params = ASN1_STRING_new();
+	X509_ALGOR p;
+
+	if (params == NULL) {
+		GOSTerror(ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
+
+	switch (digest) {
+	case NID_id_tc26_gost3411_2012_256:
+		p.algorithm = OBJ_nid2obj(NID_id_tc26_agreement_gost_3410_12_256);
+		break;
+	case NID_id_tc26_gost3411_2012_512:
+		p.algorithm = OBJ_nid2obj(NID_id_tc26_agreement_gost_3410_12_512);
+		break;
+	default:
+		GOSTerror(ERR_R_INTERNAL_ERROR);
+		break;
+	}
+	p.parameter = NULL;
+
+	params->length = i2d_X509_ALGOR(&p, &params->data);
+	params->type = V_ASN1_SEQUENCE;
+
+	return params;
+err:
+	ASN1_STRING_free(params);
+	params = NULL;
+	return NULL;
+}
+
 static int
 pub_cmp_gost01(const EVP_PKEY *a, const EVP_PKEY *b)
 {
@@ -772,10 +807,110 @@ param_cmp_gost01(const EVP_PKEY *a, const EVP_PKEY *b)
 	return 1;
 }
 
+int gost01_smime_decrypt(EVP_PKEY_CTX *pctx, X509_ALGOR *alg)
+{
+	int nid = OBJ_obj2nid(alg->algorithm);
+	int format;
+
+	switch (nid) {
+	case NID_id_GostR3410_2001:
+		/* Nothing to do */
+		return 1;
+	case NID_id_tc26_wrap_gostr3412_2015_magma_kexp15:
+		format = GOST_ENC_FORMAT_PSKEY_MAGMA;
+		break;
+	case NID_id_tc26_wrap_gostr3412_2015_kuznyechik_kexp15:
+		format = GOST_ENC_FORMAT_PSKEY_KUZNYECHIK;
+		break;
+	default:
+		GOSTerror(GOST_R_BAD_KEY_PARAMETERS_FORMAT);
+		return 0;
+	}
+	if (EVP_PKEY_CTX_ctrl(pctx, -1, EVP_PKEY_OP_DECRYPT,
+			      EVP_PKEY_CTRL_GOST_ENC_FORMAT,
+			      format, NULL) <= 0) {
+		GOSTerror(ERR_R_INTERNAL_ERROR);
+		return 0;
+	}
+
+	return 1;
+}
+
+int gost01_smime_encrypt(EVP_PKEY_CTX *ctx, X509_ALGOR *alg, int enc_nid)
+{
+	EVP_PKEY *pkey = EVP_PKEY_CTX_get0_pkey(ctx);
+	int digest, nid, format;
+	ASN1_STRING *params;
+
+	switch (enc_nid) {
+	case NID_id_Gost28147_89:
+		format = GOST_ENC_FORMAT_4490;
+		nid = NID_id_GostR3410_2001;
+		break;
+	case NID_id_tc26_cipher_gostr3412_2015_magma_ctracpkm:
+	case NID_id_tc26_cipher_gostr3412_2015_magma_ctracpkm_omac:
+		format = GOST_ENC_FORMAT_PSKEY_MAGMA;
+		nid = NID_id_tc26_wrap_gostr3412_2015_magma_kexp15;
+		break;
+	case NID_id_tc26_cipher_gostr3412_2015_kuznyechik_ctracpkm:
+	case NID_id_tc26_cipher_gostr3412_2015_kuznyechik_ctracpkm_omac:
+		format = GOST_ENC_FORMAT_PSKEY_KUZNYECHIK;
+		nid = NID_id_tc26_wrap_gostr3412_2015_kuznyechik_kexp15;
+		break;
+	default:
+		return 0;
+	}
+
+	if (EVP_PKEY_CTX_ctrl(ctx, -1, EVP_PKEY_OP_ENCRYPT,
+				EVP_PKEY_CTRL_GOST_ENC_FORMAT, format,
+				NULL) != 1)
+		return 0;
+
+	if (EVP_PKEY_CTX_ctrl(ctx, -1, EVP_PKEY_OP_ENCRYPT,
+				EVP_PKEY_CTRL_GOST_GET_DIGEST, 0,
+				&digest) != 1)
+		return 0;
+
+	switch (digest) {
+	case NID_id_GostR3411_94_CryptoProParamSet:
+		if ((params = encode_gost01_algor_params(pkey)) == NULL)
+			return -1;
+		break;
+
+	case NID_id_tc26_gost3411_2012_256:
+	case NID_id_tc26_gost3411_2012_512:
+		if ((params = encode_gost01_kexp_params(pkey)) == NULL)
+			return -1;
+		break;
+
+	default:
+		return 0;
+	}
+	return X509_ALGOR_set0(alg, OBJ_nid2obj(nid), V_ASN1_SEQUENCE, params);
+}
+
+#ifndef OPENSSL_NO_CMS
+static int
+gost01_cms_decrypt(CMS_RecipientInfo *ri)
+{
+	EVP_PKEY_CTX *pkctx;
+	X509_ALGOR *cmsalg;
+
+	pkctx = CMS_RecipientInfo_get0_pkey_ctx(ri);
+	if (pkctx == NULL)
+		return 0;
+
+	if (!CMS_RecipientInfo_ktri_get0_algs(ri, NULL, NULL, &cmsalg))
+		return 0;
+
+	return gost01_smime_decrypt(pkctx, cmsalg);
+}
+#endif
+
 static int
 pkey_ctrl_gost01(EVP_PKEY *pkey, int op, long arg1, void *arg2)
 {
-	X509_ALGOR *alg1 = NULL, *alg2 = NULL, *alg3 = NULL;
+	X509_ALGOR *alg1 = NULL, *alg2 = NULL;
 	int digest = GOST_KEY_get_digest(pkey->pkey.gost);
 
 	switch (op) {
@@ -786,8 +921,8 @@ pkey_ctrl_gost01(EVP_PKEY *pkey, int op, long arg1, void *arg2)
 					&alg1, &alg2);
 		break;
 	case ASN1_PKEY_CTRL_CMS_ENVELOPE:
-		if (arg1 == 0)
-			CMS_RecipientInfo_ktri_get0_algs(arg2, NULL, NULL, &alg3);
+		if (arg1 == 1)
+			return gost01_cms_decrypt(arg2);
 		break;
 #endif
 	case ASN1_PKEY_CTRL_PKCS7_SIGN:
@@ -795,9 +930,7 @@ pkey_ctrl_gost01(EVP_PKEY *pkey, int op, long arg1, void *arg2)
 			PKCS7_SIGNER_INFO_get0_algs(arg2, NULL, &alg1, &alg2);
 		break;
 	case ASN1_PKEY_CTRL_PKCS7_ENCRYPT:
-		if (arg1 == 0)
-			PKCS7_RECIP_INFO_get0_alg(arg2, &alg3);
-		break;
+		return 1;
 	case ASN1_PKEY_CTRL_DEFAULT_MD_NID:
 		*(int *)arg2 = GostR3410_get_md_digest(digest);
 		return 2;
@@ -810,15 +943,6 @@ pkey_ctrl_gost01(EVP_PKEY *pkey, int op, long arg1, void *arg2)
 		X509_ALGOR_set0(alg1, OBJ_nid2obj(GostR3410_get_md_digest(digest)), V_ASN1_NULL, 0);
 	if (alg2)
 		X509_ALGOR_set0(alg2, OBJ_nid2obj(GostR3410_get_pk_digest(digest)), V_ASN1_NULL, 0);
-	if (alg3) {
-		ASN1_STRING *params = encode_gost01_algor_params(pkey);
-		if (params == NULL) {
-			return -1;
-		}
-		X509_ALGOR_set0(alg3,
-		    OBJ_nid2obj(GostR3410_get_pk_digest(digest)),
-		    V_ASN1_SEQUENCE, params);
-	}
 
 	return 1;
 }

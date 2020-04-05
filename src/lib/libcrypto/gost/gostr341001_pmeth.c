@@ -61,6 +61,9 @@
 #include <openssl/ec.h>
 #include <openssl/ecdsa.h>
 #include <openssl/x509.h>
+#ifndef OPENSSL_NO_CMS
+#include <openssl/cms.h>
+#endif
 
 #include "evp_locl.h"
 #include "gost_locl.h"
@@ -817,6 +820,7 @@ static int
 pkey_gost01_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 {
 	struct gost_pmeth_data *pctx = EVP_PKEY_CTX_get_data(ctx);
+	X509_ALGOR *alg;
 
 	switch (type) {
 	case EVP_PKEY_CTRL_MD:
@@ -828,11 +832,20 @@ pkey_gost01_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 		pctx->md = p2;
 		return 1;
 	case EVP_PKEY_CTRL_PKCS7_ENCRYPT:
+		PKCS7_RECIP_INFO_get0_alg(p2, &alg);
+		return gost01_smime_encrypt(ctx, alg, p1);
 	case EVP_PKEY_CTRL_PKCS7_DECRYPT:
+		PKCS7_RECIP_INFO_get0_alg(p2, &alg);
+		return gost01_smime_decrypt(ctx, alg);
 	case EVP_PKEY_CTRL_PKCS7_SIGN:
 	case EVP_PKEY_CTRL_DIGESTINIT:
+		return 1;
+
 #ifndef OPENSSL_NO_CMS
 	case EVP_PKEY_CTRL_CMS_ENCRYPT:
+		if (CMS_RecipientInfo_ktri_get0_algs(p2, NULL, NULL, &alg) <= 0)
+			return 0;
+		return gost01_smime_encrypt(ctx, alg, p1);
 	case EVP_PKEY_CTRL_CMS_DECRYPT:
 	case EVP_PKEY_CTRL_CMS_SIGN:
 #endif

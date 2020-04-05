@@ -1016,3 +1016,7 @@ id_tc26_cipher_gostr3412_2015_kuznyechik_ctracpkm		1015
 id_tc26_cipher_gostr3412_2015_kuznyechik_ctracpkm_omac	1016
 id_tc26_cipher_gostr3412_2015_kuznyechik_mgm			1017
 kuznyechik_mac			1018
+id_tc26_agreement_gost_3410_12_256		1019
+id_tc26_agreement_gost_3410_12_512		1020
+id_tc26_wrap_gostr3412_2015_magma_kexp15	1021
+id_tc26_wrap_gostr3412_2015_kuznyechik_kexp15	1022

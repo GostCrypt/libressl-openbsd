@@ -1416,6 +1416,12 @@ tc26 1 5 2 2		: kuznyechik-ctr-acpkm-omac
 tc26 1 5 2 3		: kuznyechik-mgm
 			: kuznyechik-mac
 
+tc26 1 6 1		: id-tc26-agreement-gost-3410-12-256
+tc26 1 6 2		: id-tc26-agreement-gost-3410-12-512
+
+tc26 1 7 1 1		: id-tc26-wrap-gostr3412-2015-magma-kexp15
+tc26 1 7 2 1		: id-tc26-wrap-gostr3412-2015-kuznyechik-kexp15
+
 # Curves from draft-ietf-curdle-pkix-02
 1 3 101 110		: X25519
 1 3 101 111		: X448
