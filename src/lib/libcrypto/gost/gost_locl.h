@@ -123,6 +123,8 @@ extern BIGNUM *GOST_le2bn(const unsigned char *buf, size_t len, BIGNUM *bn);
 extern int GOST_bn2le(BIGNUM *bn, unsigned char *buf, int len);
 extern int gost01_VKO_key(EVP_PKEY *pub_key, EVP_PKEY *priv_key, const unsigned char *ukm,
     unsigned int ukm_len, int ukm_be, int out_nid, unsigned char *key);
+extern int gost01_smime_encrypt(EVP_PKEY_CTX *ctx, X509_ALGOR *alg, int nid);
+extern int gost01_smime_decrypt(EVP_PKEY_CTX *pctx, X509_ALGOR *alg);
 
 /* GOST R 34.10 parameters */
 extern int GostR3410_get_md_digest(int nid);

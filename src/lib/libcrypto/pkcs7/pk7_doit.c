@@ -138,7 +138,7 @@ err:
 }
 
 static int
-pkcs7_encode_rinfo(PKCS7_RECIP_INFO *ri, unsigned char *key, int keylen)
+pkcs7_encode_rinfo(PKCS7_RECIP_INFO *ri, unsigned char *key, int keylen, int enc_type)
 {
 	EVP_PKEY_CTX *pctx = NULL;
 	EVP_PKEY *pkey = NULL;
@@ -158,7 +158,7 @@ pkcs7_encode_rinfo(PKCS7_RECIP_INFO *ri, unsigned char *key, int keylen)
 		goto err;
 
 	if (EVP_PKEY_CTX_ctrl(pctx, -1, EVP_PKEY_OP_ENCRYPT,
-	    EVP_PKEY_CTRL_PKCS7_ENCRYPT, 0, ri) <= 0) {
+	    EVP_PKEY_CTRL_PKCS7_ENCRYPT, enc_type, ri) <= 0) {
 		PKCS7error(PKCS7_R_CTRL_ERROR);
 		goto err;
 	}
@@ -362,7 +362,7 @@ PKCS7_dataInit(PKCS7 *p7, BIO *bio)
 		/* Lets do the pub key stuff :-) */
 		for (i = 0; i < sk_PKCS7_RECIP_INFO_num(rsk); i++) {
 			ri = sk_PKCS7_RECIP_INFO_value(rsk, i);
-			if (pkcs7_encode_rinfo(ri, key, keylen) <= 0)
+			if (pkcs7_encode_rinfo(ri, key, keylen, EVP_CIPHER_type(evp_cipher)) <= 0)
 				goto err;
 		}
 		explicit_bzero(key, keylen);
