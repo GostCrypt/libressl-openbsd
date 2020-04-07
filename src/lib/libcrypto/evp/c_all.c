@@ -235,6 +235,7 @@ OpenSSL_add_all_ciphers_internal(void)
 	EVP_add_cipher(EVP_magma_ofb());
 	EVP_add_cipher(EVP_magma_ctr());
 	EVP_add_cipher(EVP_magma_ctr_acpkm());
+	EVP_add_cipher(EVP_magma_ctr_acpkm_omac());
 	EVP_add_cipher(EVP_magma_mgm());
 	EVP_add_cipher(EVP_kuznyechik_ecb());
 	EVP_add_cipher(EVP_kuznyechik_cbc());
