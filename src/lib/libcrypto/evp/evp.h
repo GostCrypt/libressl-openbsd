@@ -856,6 +856,7 @@ const EVP_CIPHER *EVP_magma_cfb64(void);
 const EVP_CIPHER *EVP_magma_ofb(void);
 const EVP_CIPHER *EVP_magma_ctr(void);
 const EVP_CIPHER *EVP_magma_ctr_acpkm(void);
+const EVP_CIPHER *EVP_magma_ctr_acpkm_omac(void);
 const EVP_CIPHER *EVP_magma_mgm(void);
 const EVP_CIPHER *EVP_kuznyechik_ecb(void);
 const EVP_CIPHER *EVP_kuznyechik_cbc(void);
