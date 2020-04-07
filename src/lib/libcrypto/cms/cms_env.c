@@ -927,7 +927,7 @@ cms_EnvelopedData_init_bio(CMS_ContentInfo *cms)
 	/* Get BIO first to set up key */
 
 	ec = cms->d.envelopedData->encryptedContentInfo;
-	ret = cms_EncryptedContent_init_bio(ec);
+	ret = cms_EncryptedContent_init_bio(ec, cms->d.envelopedData->unprotectedAttrs);
 
 	/* If error or no cipher end of processing */
 
@@ -958,6 +958,19 @@ cms_EnvelopedData_init_bio(CMS_ContentInfo *cms)
 		return ret;
 	BIO_free(ret);
 	return NULL;
+}
+
+int cms_EnvelopedData_final(CMS_ContentInfo *cms, BIO *chain)
+{
+	CMS_EnvelopedData *env = NULL;
+
+	env = cms_get0_enveloped(cms);
+	if (env == NULL) {
+		CMSerror(CMS_R_CONTENT_TYPE_NOT_ENVELOPED_DATA);
+		return 0;
+	}
+
+	return cms_EncryptedContent_final(env->encryptedContentInfo, chain, &env->unprotectedAttrs);
 }
 
 /*

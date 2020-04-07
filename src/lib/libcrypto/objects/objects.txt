@@ -1368,6 +1368,7 @@ brainpool 1 14 : brainpoolP512t1
 			: gost89-cbc
 
 member-body 643 7 1	: tc26
+tc26 0 6 1 1		: id-cms-mac-attr
 !Cname id-tc26-gost3411-2012-256
 tc26 1 2 2		: streebog256 : GOST R 34.11-2012 (256 bit)
 !Cname id-tc26-gost3411-2012-512

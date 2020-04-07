@@ -442,16 +442,21 @@ int cms_keyid_cert_cmp(ASN1_OCTET_STRING *keyid, X509 *cert);
 int cms_set1_ias(CMS_IssuerAndSerialNumber **pias, X509 *cert);
 int cms_set1_keyid(ASN1_OCTET_STRING **pkeyid, X509 *cert);
 
-BIO *cms_EncryptedContent_init_bio(CMS_EncryptedContentInfo *ec);
+BIO *cms_EncryptedContent_init_bio(CMS_EncryptedContentInfo *ec,
+    STACK_OF(X509_ATTRIBUTE) *unprotectedAttrs);
 BIO *cms_EncryptedData_init_bio(CMS_ContentInfo *cms);
+int cms_EncryptedData_final(CMS_ContentInfo *cms, BIO *chain);
 int cms_EncryptedContent_init(CMS_EncryptedContentInfo *ec,
     const EVP_CIPHER *cipher, const unsigned char *key, size_t keylen);
+int cms_EncryptedContent_final(CMS_EncryptedContentInfo *ec,
+    BIO *chain, STACK_OF(X509_ATTRIBUTE) **unprotectedAttrs);
 
 int cms_Receipt_verify(CMS_ContentInfo *cms, CMS_ContentInfo *req_cms);
 int cms_msgSigDigest_add1(CMS_SignerInfo *dest, CMS_SignerInfo *src);
 ASN1_OCTET_STRING *cms_encode_Receipt(CMS_SignerInfo *si);
 
 BIO *cms_EnvelopedData_init_bio(CMS_ContentInfo *cms);
+int cms_EnvelopedData_final(CMS_ContentInfo *cms, BIO *chain);
 CMS_EnvelopedData *cms_get0_enveloped(CMS_ContentInfo *cms);
 int cms_env_asn1_ctrl(CMS_RecipientInfo *ri, int cmd);
 int cms_pkey_get_ri_type(EVP_PKEY *pk);
