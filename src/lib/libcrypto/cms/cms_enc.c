@@ -68,7 +68,8 @@
 /* Return BIO based on EncryptedContentInfo and key */
 
 BIO *
-cms_EncryptedContent_init_bio(CMS_EncryptedContentInfo *ec)
+cms_EncryptedContent_init_bio(CMS_EncryptedContentInfo *ec,
+    STACK_OF(X509_ATTRIBUTE) *unprotectedAttrs)
 {
 	BIO *b;
 	EVP_CIPHER_CTX *ctx;
@@ -189,6 +190,23 @@ cms_EncryptedContent_init_bio(CMS_EncryptedContentInfo *ec)
 			ASN1_TYPE_free(calg->parameter);
 			calg->parameter = NULL;
 		}
+	} else if (ciph->flags & EVP_CIPH_FLAG_AEAD_CIPHER) {
+		int idx = X509at_get_attr_by_NID(unprotectedAttrs, NID_id_cms_mac_attr, -1);
+		X509_ATTRIBUTE *attr;
+		ASN1_TYPE *type;
+
+		if (idx == -1 ||
+		    (attr = X509at_get_attr(unprotectedAttrs, idx)) == NULL ||
+		    attr->single != 0 ||
+		    sk_ASN1_TYPE_num(attr->value.set) != 1 ||
+		    (type = sk_ASN1_TYPE_value(attr->value.set, 0)) == NULL ||
+		    type->type != V_ASN1_OCTET_STRING ||
+		    !EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG,
+			    type->value.octet_string->length,
+			    type->value.octet_string->data)) {
+			CMSerror(CMS_R_CIPHER_PARAMETER_INITIALISATION_ERROR);
+			goto err;
+		}
 	}
 	ok = 1;
 
@@ -202,6 +220,43 @@ cms_EncryptedContent_init_bio(CMS_EncryptedContentInfo *ec)
 		return b;
 	BIO_free(b);
 	return NULL;
+}
+
+int cms_EncryptedContent_final(CMS_EncryptedContentInfo *ec,
+    BIO *chain, STACK_OF(X509_ATTRIBUTE) **unprotectedAttrs)
+{
+	EVP_CIPHER_CTX *ctx = NULL;
+	BIO *mbio = BIO_find_type(chain, BIO_TYPE_CIPHER);
+
+	if (mbio == NULL) {
+		CMSerror(CMS_R_CONTENT_NOT_FOUND);
+		return 0;
+	}
+
+	BIO_get_cipher_ctx(mbio, &ctx);
+	if (EVP_CIPHER_CTX_flags(ctx) & EVP_CIPH_FLAG_AEAD_CIPHER) {
+		unsigned char tag[EVP_MAX_MD_SIZE];
+		int taglen;
+		int nid = EVP_CIPHER_CTX_nid(ctx);
+
+		/* Most of the AEAD ciphers have 16-bit tags except Magma ciphers */
+		if (nid == NID_id_tc26_cipher_gostr3412_2015_magma_ctracpkm_omac ||
+		    nid == NID_id_tc26_cipher_gostr3412_2015_magma_mgm)
+			taglen = 8;
+		else
+			taglen = 16;
+
+		if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG,
+					taglen, tag) <= 0) {
+			CMSerror(CMS_R_CTRL_FAILURE);
+			return 0;
+		}
+
+		if (!X509at_add1_attr_by_NID(unprotectedAttrs, NID_id_cms_mac_attr, V_ASN1_OCTET_STRING, tag, taglen))
+			return 0;
+	}
+
+	return 1;
 }
 
 int
@@ -258,5 +313,12 @@ cms_EncryptedData_init_bio(CMS_ContentInfo *cms)
 	if (enc->encryptedContentInfo->cipher && enc->unprotectedAttrs)
 		enc->version = 2;
 
-	return cms_EncryptedContent_init_bio(enc->encryptedContentInfo);
+	return cms_EncryptedContent_init_bio(enc->encryptedContentInfo, enc->unprotectedAttrs);
+}
+
+int cms_EncryptedData_final(CMS_ContentInfo *cms, BIO *chain)
+{
+	CMS_EncryptedData *enc = cms->d.encryptedData;
+
+	return cms_EncryptedContent_final(enc->encryptedContentInfo, chain, &enc->unprotectedAttrs);
 }
