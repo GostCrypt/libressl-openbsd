@@ -242,6 +242,7 @@ OpenSSL_add_all_ciphers_internal(void)
 	EVP_add_cipher(EVP_kuznyechik_ofb());
 	EVP_add_cipher(EVP_kuznyechik_ctr());
 	EVP_add_cipher(EVP_kuznyechik_ctr_acpkm());
+	EVP_add_cipher(EVP_kuznyechik_ctr_acpkm_omac());
 	EVP_add_cipher(EVP_kuznyechik_mgm());
 #endif
 

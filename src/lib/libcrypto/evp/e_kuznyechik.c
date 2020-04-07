@@ -25,12 +25,22 @@
 #include <openssl/err.h>
 #include <openssl/modes.h>
 #include <openssl/gost.h>
+#include <openssl/cmac.h>
+#include <openssl/kdftree.h>
 #include "evp_locl.h"
 #include "modes_lcl.h"
 
 typedef struct {
 	KUZNYECHIK_KEY ks;
 } EVP_KUZNYECHIK_CTX;
+
+typedef struct {
+	KUZNYECHIK_KEY ks;
+	CMAC_CTX *cmac;
+	int iv_set;
+	int taglen;
+	unsigned char tag[16];
+} EVP_KUZNYECHIK_CTR_ACPKM_OMAC_CTX;
 
 static int
 kuznyechik_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
@@ -178,6 +188,160 @@ kuznyechik_ctr_acpkm_get_asn1_params(EVP_CIPHER_CTX *ctx, ASN1_TYPE *params)
 	return gost3412_ctr_acpkm_get_asn1_params(ctx, params, EVP_CIPHER_CTX_iv_length(ctx));
 }
 
+static int
+kuznyechik_ctr_acpkm_omac_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
+    const unsigned char *iv, int enc)
+{
+	EVP_KUZNYECHIK_CTR_ACPKM_OMAC_CTX *c = ctx->cipher_data;
+	unsigned char out[64];
+
+	c->taglen = -1;
+	if (iv) {
+		unsigned int il = EVP_CIPHER_CTX_iv_length(ctx) - 8;
+		memcpy(ctx->iv, iv, il);
+		memset(ctx->iv + il, 0, EVP_MAX_IV_LENGTH - il);
+		memcpy(ctx->oiv, iv + il, 8);
+		c->iv_set = 1;
+		ctx->num = 0;
+	}
+
+	if (!key)
+		return 1;
+
+	if (!c->iv_set)
+		return 0;
+
+	if (!KDF_TREE(EVP_streebog256(), NULL,
+			key, EVP_CIPHER_CTX_key_length(ctx),
+			"kdf tree", 8,
+			ctx->oiv, 8,
+			1,
+			out, sizeof(out)))
+		return 0;
+
+	Kuznyechik_set_key(&c->ks, out, 1);
+
+	return CMAC_Init(c->cmac, out + 32, 32, EVP_kuznyechik_cbc(), NULL);
+}
+
+static int
+kuznyechik_ctr_acpkm_omac_cleanup(EVP_CIPHER_CTX *ctx)
+{
+	EVP_KUZNYECHIK_CTR_ACPKM_OMAC_CTX *c = ctx->cipher_data;
+
+	CMAC_CTX_free(c->cmac);
+
+	return 1;
+}
+
+static int
+kuznyechik_ctr_acpkm_omac_ctl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr)
+{
+	EVP_KUZNYECHIK_CTR_ACPKM_OMAC_CTX *key = EVP_C_DATA(EVP_KUZNYECHIK_CTR_ACPKM_OMAC_CTX, ctx);
+
+	switch (type) {
+	case EVP_CTRL_GOST_SET_MESHING:
+		key->ks.key_meshing = arg;
+		return 1;
+	case EVP_CTRL_INIT:
+		/* deafult for tests */
+		key->ks.key_meshing = 32;
+		key->iv_set = 0;
+		key->cmac = CMAC_CTX_new();
+		return 1;
+	case EVP_CTRL_GCM_SET_TAG:
+		if (arg <= 0 || arg > sizeof(key->tag) || ctx->encrypt)
+			return 0;
+
+		memcpy(key->tag, ptr, arg);
+		key->taglen = arg;
+		return 1;
+	case EVP_CTRL_GCM_GET_TAG:
+		if (arg <= 0 || arg > sizeof(key->tag) || !ctx->encrypt || key->taglen < 0)
+			return 0;
+		memcpy(ptr, key->tag, arg);
+		return 1;
+	default:
+		return kuznyechik_ctl(ctx, type, arg, ptr);
+	}
+}
+
+static int
+kuznyechik_ctr_acpkm_omac_final(EVP_CIPHER_CTX *ctx)
+{
+	EVP_KUZNYECHIK_CTR_ACPKM_OMAC_CTX *key = EVP_C_DATA(EVP_KUZNYECHIK_CTR_ACPKM_OMAC_CTX, ctx);
+	unsigned char tmp[EVP_MAX_BLOCK_LENGTH];
+	size_t taglen = sizeof(tmp);
+
+	/* Do not reuse IV */
+	key->iv_set = 0;
+
+	CMAC_Final(key->cmac, tmp, &taglen);
+	if (ctx->encrypt) {
+		CRYPTO_ctr128_encrypt(tmp, key->tag, taglen, &key->ks, ctx->iv, ctx->buf,
+				&ctx->num, (block128_f)Kuznyechik_acpkm_encrypt);
+		key->taglen = taglen;
+	} else {
+		CRYPTO_ctr128_encrypt(tmp, tmp, taglen, &key->ks, ctx->iv, ctx->buf,
+				&ctx->num, (block128_f)Kuznyechik_acpkm_encrypt);
+		if (key->taglen <= 0 ||
+		    key->taglen > taglen ||
+		    timingsafe_memcmp(tmp, key->tag, key->taglen))
+			return -1;
+	}
+
+	return 0;
+}
+
+static int
+kuznyechik_ctr_acpkm_omac_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in,
+		size_t len)
+{
+	EVP_KUZNYECHIK_CTR_ACPKM_OMAC_CTX *key = EVP_C_DATA(EVP_KUZNYECHIK_CTR_ACPKM_OMAC_CTX, ctx);
+
+	if (ctx->encrypt)
+		CMAC_Update(key->cmac, in, len);
+
+	CRYPTO_ctr128_encrypt(in, out, len, &key->ks, ctx->iv, ctx->buf,
+			&ctx->num, (block128_f)Kuznyechik_acpkm_encrypt);
+	if (!ctx->encrypt)
+		CMAC_Update(key->cmac, out, len);
+
+	if (!in)
+		return kuznyechik_ctr_acpkm_omac_final(ctx);
+
+	return len;
+}
+
+static int
+kuznyechik_ctr_acpkm_omac_set_asn1_params(EVP_CIPHER_CTX *ctx, ASN1_TYPE *params)
+{
+	/* Also set meshing section size here.
+	 * There is no other good place to enable meshing for CMS
+	 */
+	EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GOST_SET_MESHING, 256 * 1024, 0);
+
+	return gost3412_ctr_acpkm_set_asn1_params(ctx, params, EVP_CIPHER_CTX_iv_length(ctx) - 8);
+}
+
+static int
+kuznyechik_ctr_acpkm_omac_get_asn1_params(EVP_CIPHER_CTX *ctx, ASN1_TYPE *params)
+{
+	int ret;
+	EVP_KUZNYECHIK_CTR_ACPKM_OMAC_CTX *key = EVP_C_DATA(EVP_KUZNYECHIK_CTR_ACPKM_OMAC_CTX, ctx);
+
+	/* Also set meshing section size here.
+	 * There is no other good place to enable meshing for CMS
+	 */
+	EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GOST_SET_MESHING, 256 * 1024, 0);
+
+	ret = gost3412_ctr_acpkm_get_asn1_params(ctx, params, EVP_CIPHER_CTX_iv_length(ctx) - 8);
+	if (ret > 0)
+		key->iv_set = 1;
+
+	return ret;
+}
+
 IMPLEMENT_BLOCK_CIPHER(kuznyechik, ks, Kuznyechik, EVP_KUZNYECHIK_CTX,
 		NID_kuznyechik, 16, 32, 16, 128, 0, kuznyechik_init_key, NULL,
 		EVP_CIPHER_set_asn1_iv,
@@ -199,6 +363,17 @@ BLOCK_CIPHER_def1(kuznyechik, ctr_acpkm, ctr_acpkm, CTR, EVP_KUZNYECHIK_CTX,
 		kuznyechik_ctr_acpkm_set_asn1_params,
 		kuznyechik_ctr_acpkm_get_asn1_params,
 		kuznyechik_acpkm_ctl)
+
+#define NID_kuznyechik_ctr_acpkm_omac NID_id_tc26_cipher_gostr3412_2015_kuznyechik_ctracpkm_omac
+
+BLOCK_CIPHER_def1(kuznyechik, ctr_acpkm_omac, ctr_acpkm_omac, CTR, EVP_KUZNYECHIK_CTR_ACPKM_OMAC_CTX,
+		NID_kuznyechik, 1, 32, 16,
+		EVP_CIPH_FLAG_AEAD_CIPHER | EVP_CIPH_CTRL_INIT | EVP_CIPH_ALWAYS_CALL_INIT | EVP_CIPH_CUSTOM_IV |EVP_CIPH_FLAG_CUSTOM_CIPHER,
+		kuznyechik_ctr_acpkm_omac_init_key,
+		kuznyechik_ctr_acpkm_omac_cleanup,
+		kuznyechik_ctr_acpkm_omac_set_asn1_params,
+		kuznyechik_ctr_acpkm_omac_get_asn1_params,
+		kuznyechik_ctr_acpkm_omac_ctl)
 
 #define EVP_AEAD_KUZNYECHIK_MGM_TAG_LEN 16
 
