@@ -414,6 +414,7 @@ cms_wrap_init(CMS_KeyAgreeRecipientInfo *kari, const EVP_CIPHER *cipher)
 	EVP_CIPHER_CTX *ctx = kari->ctx;
 	const EVP_CIPHER *kekcipher;
 	int keylen = EVP_CIPHER_key_length(cipher);
+	int type = EVP_CIPHER_type(cipher);
 
 	/* If a suitable wrap algorithm is already set nothing to do */
 	kekcipher = EVP_CIPHER_CTX_cipher(ctx);
@@ -437,6 +438,15 @@ cms_wrap_init(CMS_KeyAgreeRecipientInfo *kari, const EVP_CIPHER *cipher)
 		kekcipher = EVP_des_ede3_wrap();
 	else
 #endif
+#endif
+#ifndef OPENSSL_NO_GOST
+	if (type == NID_id_tc26_cipher_gostr3412_2015_magma_ctracpkm ||
+	    type == NID_id_tc26_cipher_gostr3412_2015_magma_ctracpkm_omac)
+		kekcipher = EVP_magma_kexp15_wrap();
+	else if (type == NID_id_tc26_cipher_gostr3412_2015_kuznyechik_ctracpkm ||
+	    type == NID_id_tc26_cipher_gostr3412_2015_kuznyechik_ctracpkm_omac)
+		kekcipher = EVP_kuznyechik_kexp15_wrap();
+	else
 #endif
 	if (keylen <= 16)
 		kekcipher = EVP_aes_128_wrap();
