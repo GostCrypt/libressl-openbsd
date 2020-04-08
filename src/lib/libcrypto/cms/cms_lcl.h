@@ -460,6 +460,7 @@ int cms_EnvelopedData_final(CMS_ContentInfo *cms, BIO *chain);
 CMS_EnvelopedData *cms_get0_enveloped(CMS_ContentInfo *cms);
 int cms_env_asn1_ctrl(CMS_RecipientInfo *ri, int cmd);
 int cms_pkey_get_ri_type(EVP_PKEY *pk);
+int cms_pkey_is_ri_type_supported(EVP_PKEY *pk, int ri_type);
 /* KARI routines */
 int cms_RecipientInfo_kari_init(CMS_RecipientInfo *ri, X509 *recip,
     EVP_PKEY *pk, unsigned int flags);

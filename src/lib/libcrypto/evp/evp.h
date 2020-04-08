@@ -1036,6 +1036,7 @@ void EVP_PBE_cleanup(void);
 #define ASN1_PKEY_CTRL_CMS_SIGN		0x5
 #define ASN1_PKEY_CTRL_CMS_ENVELOPE	0x7
 #define ASN1_PKEY_CTRL_CMS_RI_TYPE	0x8
+#define ASN1_PKEY_CTRL_CMS_IS_RI_TYPE_SUPPORTED	0x9
 
 int EVP_PKEY_asn1_get_count(void);
 const EVP_PKEY_ASN1_METHOD *EVP_PKEY_asn1_get0(int idx);
