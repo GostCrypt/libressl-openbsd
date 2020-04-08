@@ -713,9 +713,11 @@ cms_kari_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it, void *exarg)
 			return 0;
 		EVP_CIPHER_CTX_set_flags(kari->ctx, EVP_CIPHER_CTX_FLAG_WRAP_ALLOW);
 		kari->pctx = NULL;
+		kari->originator_pkey = NULL;
 	} else if (operation == ASN1_OP_FREE_POST) {
 		EVP_PKEY_CTX_free(kari->pctx);
 		EVP_CIPHER_CTX_free(kari->ctx);
+		EVP_PKEY_free(kari->originator_pkey);
 	}
 	return 1;
 }

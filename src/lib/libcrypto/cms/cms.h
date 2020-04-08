@@ -198,6 +198,7 @@ int CMS_decrypt_set1_key(CMS_ContentInfo *cms, unsigned char *key,
     size_t keylen, const unsigned char *id, size_t idlen);
 int CMS_decrypt_set1_password(CMS_ContentInfo *cms, unsigned char *pass,
     ssize_t passlen);
+int CMS_decrypt_set1_originator(CMS_ContentInfo *cms, X509 *cert);
 
 STACK_OF(CMS_RecipientInfo) *CMS_get0_RecipientInfos(CMS_ContentInfo *cms);
 int CMS_RecipientInfo_type(CMS_RecipientInfo *ri);
@@ -525,6 +526,7 @@ int ERR_load_CMS_strings(void);
 #define CMS_R_UNWRAP_FAILURE                             180
 #define CMS_R_VERIFICATION_FAILURE                       158
 #define CMS_R_WRAP_ERROR                                 159
+#define CMS_R_NO_MATCHING_ORIGINATOR                     160
 
 #ifdef  __cplusplus
 }

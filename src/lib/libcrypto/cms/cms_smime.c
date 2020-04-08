@@ -672,6 +672,59 @@ cms_kari_set1_pkey(CMS_ContentInfo *cms, CMS_RecipientInfo *ri, EVP_PKEY *pk,
 	return 0;
 }
 
+static int
+cms_kari_set1_peer(CMS_ContentInfo *cms, CMS_RecipientInfo *ri,
+    X509 *cert)
+{
+	EVP_PKEY *pk = X509_get0_pubkey(cert);
+	if (!pk) {
+		CMSerror(CMS_R_ERROR_GETTING_PUBLIC_KEY);
+		return -1;
+	}
+
+	EVP_PKEY_up_ref(pk);
+	ri->d.kari->originator_pkey = pk;
+
+	return 1;
+}
+
+int
+CMS_decrypt_set1_originator(CMS_ContentInfo *cms, X509 *cert)
+{
+	STACK_OF(CMS_RecipientInfo) *ris;
+	CMS_RecipientInfo *ri;
+	int i, r, rv = 0;
+	int debug = 0;
+
+	ris = CMS_get0_RecipientInfos(cms);
+	if (ris)
+		debug = cms->d.envelopedData->encryptedContentInfo->debug;
+
+	for (i = 0; i < sk_CMS_RecipientInfo_num(ris); i++) {
+		int ri_type;
+
+		ri = sk_CMS_RecipientInfo_value(ris, i);
+		ri_type = CMS_RecipientInfo_type(ri);
+		if (ri_type == CMS_RECIPINFO_AGREE && !CMS_RecipientInfo_kari_orig_id_cmp(ri, cert)) {
+			r = cms_kari_set1_peer(cms, ri, cert);
+			if (r > 0)
+				rv = 1;
+			if (r < 0)
+				return 0;
+		}
+	}
+	/* If not debugging always return success */
+	if (!debug) {
+		ERR_clear_error();
+		return 1;
+	}
+
+	if (!rv)
+		CMSerror(CMS_R_NO_MATCHING_ORIGINATOR);
+
+	return rv;
+}
+
 int
 CMS_decrypt_set1_pkey(CMS_ContentInfo *cms, EVP_PKEY *pk, X509 *cert)
 {
