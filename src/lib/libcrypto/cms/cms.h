@@ -324,6 +324,7 @@ void CMS_ReceiptRequest_get0_values(CMS_ReceiptRequest *rr, ASN1_STRING **pcid,
 #endif
 int CMS_RecipientInfo_kari_get0_alg(CMS_RecipientInfo *ri, X509_ALGOR **palg,
     ASN1_OCTET_STRING **pukm);
+int CMS_RecipientInfo_kari_set0_ukm(CMS_RecipientInfo *ri, const unsigned char *d, int len);
 STACK_OF(CMS_RecipientEncryptedKey) *
     CMS_RecipientInfo_kari_get0_reks(CMS_RecipientInfo *ri);
 
