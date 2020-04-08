@@ -301,6 +301,7 @@ void ERR_load_GOST_strings(void);
 #define GOST_R_SIGNATURE_MISMATCH			 121
 #define GOST_R_SIGNATURE_PARTS_GREATER_THAN_Q		 122
 #define GOST_R_UKM_NOT_SET				 123
+#define GOST_R_NO_ORIGINATOR_CERTIFICATE		 124
 
 #ifdef  __cplusplus
 }
