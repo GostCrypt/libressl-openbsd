@@ -82,6 +82,23 @@ CMS_RecipientInfo_kari_get0_alg(CMS_RecipientInfo *ri, X509_ALGOR **palg,
 	return 1;
 }
 
+int
+CMS_RecipientInfo_kari_set0_ukm(CMS_RecipientInfo *ri, const unsigned char *d, int len)
+{
+	if (ri->type != CMS_RECIPINFO_AGREE) {
+		CMSerror(CMS_R_NOT_KEY_AGREEMENT);
+		return 0;
+	}
+	if (ri->d.kari->ukm == NULL)
+		ri->d.kari->ukm = ASN1_STRING_new();
+	if (ri->d.kari->ukm == NULL) {
+		CMSerror(ERR_R_MALLOC_FAILURE);
+		return 0;
+	}
+
+	return ASN1_OCTET_STRING_set(ri->d.kari->ukm, d, len);
+}
+
 /* Retrieve recipient encrypted keys from a kari */
 
 STACK_OF(CMS_RecipientEncryptedKey) *
