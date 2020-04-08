@@ -263,25 +263,24 @@ pkey_bits_gost01(const EVP_PKEY *pk)
 }
 
 static int
-pub_decode_gost01(EVP_PKEY *pk, X509_PUBKEY *pub)
+pub_decode_gost01_int(EVP_PKEY *pk, X509_ALGOR *palg, const unsigned char *pubkey_buf, int pub_len)
 {
-	X509_ALGOR *palg = NULL;
-	const unsigned char *pubkey_buf = NULL;
+	const ASN1_OBJECT *poid;
 	const unsigned char *p;
-	ASN1_OBJECT *palgobj = NULL;
-	int pub_len;
 	BIGNUM *X, *Y;
 	ASN1_OCTET_STRING *octet = NULL;
 	int len;
 	int ret;
 	int ptype = V_ASN1_UNDEF;
 	ASN1_STRING *pval = NULL;
+	int nid;
 
-	if (X509_PUBKEY_get0_param(&palgobj, &pubkey_buf, &pub_len, &palg, pub)
-	    == 0)
+	X509_ALGOR_get0(&poid, &ptype, (const void **)&pval, palg);
+	nid = OBJ_obj2nid(poid);
+	if (nid != NID_id_GostR3410_2001 &&
+	    nid != NID_id_tc26_gost3410_2012_256 &&
+	    nid != NID_id_tc26_gost3410_2012_512)
 		return 0;
-	(void)EVP_PKEY_assign_GOST(pk, NULL);
-	X509_ALGOR_get0(NULL, &ptype, (const void **)&pval, palg);
 	if (ptype != V_ASN1_SEQUENCE) {
 		GOSTerror(GOST_R_BAD_KEY_PARAMETERS_FORMAT);
 		return 0;
@@ -315,26 +314,44 @@ pub_decode_gost01(EVP_PKEY *pk, X509_PUBKEY *pub)
 }
 
 static int
-pub_encode_gost01(X509_PUBKEY *pub, const EVP_PKEY *pk)
+pub_decode_gost01(EVP_PKEY *pk, X509_PUBKEY *pub)
+{
+	X509_ALGOR *palg = NULL;
+	const unsigned char *pubkey_buf = NULL;
+	int pub_len;
+
+	if (X509_PUBKEY_get0_param(NULL, &pubkey_buf, &pub_len, &palg, pub) == 0)
+		return 0;
+	(void)EVP_PKEY_assign_GOST(pk, NULL);
+
+	return pub_decode_gost01_int(pk, palg, pubkey_buf, pub_len);
+}
+
+static int
+pub_encode_gost01_int(const EVP_PKEY *pk, ASN1_OBJECT **palgobj, ASN1_STRING **pparams, unsigned char **pbuf, int *plen)
 {
 	ASN1_OBJECT *algobj = NULL;
 	ASN1_OCTET_STRING *octet = NULL;
 	ASN1_STRING *params = NULL;
-	void *pval = NULL;
 	unsigned char *buf = NULL, *sptr;
 	int key_size, ret = 0;
 	const EC_POINT *pub_key;
 	BIGNUM *X = NULL, *Y = NULL;
 	const GOST_KEY *ec = pk->pkey.gost;
-	int ptype = V_ASN1_UNDEF;
+
+	*palgobj = NULL;
+	*pparams = NULL;
+	*pbuf = NULL;
+	*plen = 0;
 
 	algobj = OBJ_nid2obj(GostR3410_get_pk_digest(GOST_KEY_get_digest(ec)));
+	if (algobj == NULL)
+		return 0;
+
 	if (pk->save_parameters) {
 		params = encode_gost01_algor_params(pk);
 		if (params == NULL)
-			return 0;
-		pval = params;
-		ptype = V_ASN1_SEQUENCE;
+			goto err;
 	}
 
 	key_size = GOST_KEY_get_size(ec);
@@ -375,21 +392,44 @@ pub_encode_gost01(X509_PUBKEY *pub, const EVP_PKEY *pk)
 	GOST_bn2le(X, sptr, key_size);
 	GOST_bn2le(Y, sptr + key_size, key_size);
 
-	BN_free(Y);
-	BN_free(X);
-
 	ret = i2d_ASN1_OCTET_STRING(octet, &buf);
-	ASN1_BIT_STRING_free(octet);
 	if (ret < 0)
-		return 0;
+		goto err;
 
-	return X509_PUBKEY_set0_param(pub, algobj, ptype, pval, buf, ret);
+	*palgobj = algobj;
+	*pparams = params;
+	*pbuf = buf;
+	*plen = ret;
+
+	return 1;
 
 err:
 	BN_free(Y);
 	BN_free(X);
 	ASN1_BIT_STRING_free(octet);
 	ASN1_STRING_free(params);
+	ASN1_OBJECT_free(algobj);
+	return 0;
+}
+
+static int
+pub_encode_gost01(X509_PUBKEY *pub, const EVP_PKEY *pk)
+{
+	ASN1_OBJECT *algobj = NULL;
+	ASN1_STRING *params = NULL;
+	unsigned char *buf = NULL;
+	int len;
+
+	if (pub_encode_gost01_int(pk, &algobj, &params, &buf, &len) <= 0)
+		return 0;
+
+	if (X509_PUBKEY_set0_param(pub, algobj, V_ASN1_SEQUENCE, params, buf, len) == 1)
+		return 1;
+
+	free(buf);
+	ASN1_STRING_free(params);
+	ASN1_OBJECT_free(algobj);
+
 	return 0;
 }
 
@@ -891,6 +931,89 @@ int gost01_smime_encrypt(EVP_PKEY_CTX *ctx, X509_ALGOR *alg, int enc_nid)
 
 #ifndef OPENSSL_NO_CMS
 static int
+gost01_cms_set_peerkey(EVP_PKEY_CTX *pctx, X509_ALGOR *alg,
+    ASN1_BIT_STRING *pubkey)
+{
+	int rv = 0;
+	EVP_PKEY *pkpeer = NULL;
+	int ret;
+
+	pkpeer = EVP_PKEY_new();
+	if (pkpeer == NULL)
+		return 0;
+	(void)EVP_PKEY_assign_GOST(pkpeer, NULL);
+
+	ret = pub_decode_gost01_int(pkpeer, alg, pubkey->data, pubkey->length);
+	if (ret <= 0)
+		goto err;
+
+	if (EVP_PKEY_derive_set_peer(pctx, pkpeer) > 0)
+		rv = 1;
+ err:
+
+	EVP_PKEY_free(pkpeer);
+	return rv;
+}
+
+static int
+gost01_cms_decrypt_kari(EVP_PKEY_CTX *pctx, CMS_RecipientInfo *ri)
+{
+	EVP_CIPHER_CTX *kekctx;
+	X509_ALGOR *alg;
+	ASN1_OCTET_STRING *ukm;
+	const EVP_CIPHER *kekcipher;
+
+	if (!CMS_RecipientInfo_kari_get0_alg(ri, &alg, &ukm))
+		return 0;
+
+	if (ukm == NULL)
+		return 0;
+
+	if (EVP_PKEY_CTX_ctrl(pctx, -1, EVP_PKEY_OP_DERIVE,
+				EVP_PKEY_CTRL_SET_IV, ukm->length, ukm->data) < 0)
+		return 0;
+
+	if (!EVP_PKEY_CTX_get0_peerkey(pctx)) {
+		ASN1_BIT_STRING *pubkey;
+		X509_ALGOR *pkalg;
+
+		if (!CMS_RecipientInfo_kari_get0_orig_id(ri, &pkalg, &pubkey,
+					NULL, NULL, NULL))
+			return 0;
+		if (!pkalg || !pubkey) {
+			GOSTerror(GOST_R_NO_ORIGINATOR_CERTIFICATE);
+			return 0;
+		}
+		if (!gost01_cms_set_peerkey(pctx, pkalg, pubkey)) {
+			GOSTerror(GOST_R_INCOMPATIBLE_PEER_KEY);
+			return 0;
+		}
+	}
+
+	if (alg->parameter->type != V_ASN1_SEQUENCE)
+		return 0;
+
+	kekctx = CMS_RecipientInfo_kari_get0_ctx(ri);
+	if (!kekctx)
+		return 0;
+
+	kekcipher = EVP_get_cipherbyobj(alg->algorithm);
+	if (!kekcipher || EVP_CIPHER_mode(kekcipher) != EVP_CIPH_WRAP_MODE)
+		return 0;
+	if (!EVP_EncryptInit_ex(kekctx, kekcipher, NULL, NULL, ukm->data))
+		return 0;
+
+	if (EVP_PKEY_CTX_ctrl(pctx, -1, EVP_PKEY_OP_DERIVE,
+				EVP_PKEY_CTRL_GOST_DERIVE_FORMAT,
+				GOST_DERIVE_FORMAT_KEG, NULL) <= 0) {
+		GOSTerror(ERR_R_INTERNAL_ERROR);
+		return 0;
+	}
+
+	return 1;
+}
+
+static int
 gost01_cms_decrypt(CMS_RecipientInfo *ri)
 {
 	EVP_PKEY_CTX *pkctx;
@@ -899,12 +1022,116 @@ gost01_cms_decrypt(CMS_RecipientInfo *ri)
 	pkctx = CMS_RecipientInfo_get0_pkey_ctx(ri);
 	if (pkctx == NULL)
 		return 0;
+	switch (CMS_RecipientInfo_type(ri)) {
+	case CMS_RECIPINFO_TRANS:
+		if (!CMS_RecipientInfo_ktri_get0_algs(ri, NULL, NULL, &cmsalg))
+			return 0;
+		return gost01_smime_decrypt(pkctx, cmsalg);
+	case CMS_RECIPINFO_AGREE:
+		return gost01_cms_decrypt_kari(pkctx, ri);
+	default:
+		GOSTerror(ERR_R_INTERNAL_ERROR);
+		return 0;
+	}
+}
 
-	if (!CMS_RecipientInfo_ktri_get0_algs(ri, NULL, NULL, &cmsalg))
+static int
+gost01_cms_encrypt_kari(CMS_RecipientInfo *ri)
+{
+	EVP_PKEY_CTX *pctx;
+	EVP_PKEY *pkey;
+	EVP_CIPHER_CTX *ctx;
+	X509_ALGOR *talg, *wrap_alg = NULL;
+	ASN1_BIT_STRING *pubkey;
+	int wrap_nid;
+	unsigned char iv[32];
+	ASN1_STRING *params;
+
+	pctx = CMS_RecipientInfo_get0_pkey_ctx(ri);
+	if (!pctx)
 		return 0;
 
-	return gost01_smime_decrypt(pkctx, cmsalg);
+	/* Get ephemeral key */
+	pkey = EVP_PKEY_CTX_get0_pkey(pctx);
+	if (pkey == NULL)
+		return 0;
+
+	if (EVP_PKEY_CTX_ctrl(pctx, -1, EVP_PKEY_OP_DERIVE,
+				EVP_PKEY_CTRL_GOST_DERIVE_FORMAT,
+				GOST_DERIVE_FORMAT_KEG, NULL) <= 0) {
+		GOSTerror(ERR_R_INTERNAL_ERROR);
+		return 0;
+	}
+
+	if (!CMS_RecipientInfo_kari_get0_orig_id(ri, &talg, &pubkey,
+	    NULL, NULL, NULL))
+		goto err;
+
+	/* Ephemeral key */
+	if (talg) {
+		const ASN1_OBJECT *aoid = NULL;
+
+		X509_ALGOR_get0(&aoid, NULL, NULL, talg);
+
+		/* Is everything uninitialised? */
+		if (aoid == OBJ_nid2obj(NID_undef)) {
+			ASN1_OBJECT *algobj = NULL;
+			ASN1_STRING *params = NULL;
+			unsigned char *buf = NULL;
+			int len;
+
+			if (pub_encode_gost01_int(pkey, &algobj, &params, &buf, &len) <= 0)
+				return 0;
+
+			X509_ALGOR_set0(talg, algobj, V_ASN1_SEQUENCE, params);
+			ASN1_STRING_set0(pubkey, buf, len);
+		}
+	}
+
+	/* Get wrap NID */
+	ctx = CMS_RecipientInfo_kari_get0_ctx(ri);
+	wrap_nid = EVP_CIPHER_CTX_type(ctx);
+
+	/* Package wrap algorithm in an AlgorithmIdentifier */
+
+	if (!CMS_RecipientInfo_kari_get0_alg(ri, &wrap_alg, NULL))
+		goto err;
+	if (wrap_alg == NULL)
+		goto err;
+	if ((params = encode_gost01_kexp_params(pkey)) == NULL)
+		goto err;
+	X509_ALGOR_set0(wrap_alg, OBJ_nid2obj(wrap_nid), V_ASN1_SEQUENCE, params);
+
+	arc4random_buf(iv, sizeof(iv));
+	if (EVP_PKEY_CTX_ctrl(pctx, -1, EVP_PKEY_OP_DERIVE,
+	    EVP_PKEY_CTRL_SET_IV, sizeof(iv), iv) < 0)
+		goto err;
+
+	if (!EVP_CipherInit_ex(ctx, NULL, NULL, NULL, iv, -1))
+		goto err;
+
+	if (!CMS_RecipientInfo_kari_set0_ukm(ri, iv, sizeof(iv)))
+		goto err;
+
+	return 1;
+err:
+	return 0;
 }
+
+static int
+gost01_cms_encrypt(CMS_RecipientInfo *ri)
+{
+	switch (CMS_RecipientInfo_type(ri)) {
+	case CMS_RECIPINFO_TRANS:
+		/* do nothing, handled in pmeth */
+		return 1;
+	case CMS_RECIPINFO_AGREE:
+		return gost01_cms_encrypt_kari(ri);
+	default:
+		return 0;
+	}
+}
+
 #endif
 
 static int
@@ -921,8 +1148,18 @@ pkey_ctrl_gost01(EVP_PKEY *pkey, int op, long arg1, void *arg2)
 					&alg1, &alg2);
 		break;
 	case ASN1_PKEY_CTRL_CMS_ENVELOPE:
-		if (arg1 == 1)
+		if (arg1 == 0)
+			return gost01_cms_encrypt(arg2);
+		else if (arg1 == 1)
 			return gost01_cms_decrypt(arg2);
+		break;
+	case ASN1_PKEY_CTRL_CMS_RI_TYPE:
+		if (arg2 != NULL)
+			*(int *)arg2 = CMS_RECIPINFO_TRANS; /* default */
+		break;
+	case ASN1_PKEY_CTRL_CMS_IS_RI_TYPE_SUPPORTED:
+		if (arg2 != NULL)
+			*(int *)arg2 = (arg1 == CMS_RECIPINFO_TRANS || arg1 == CMS_RECIPINFO_AGREE);
 		break;
 #endif
 	case ASN1_PKEY_CTRL_PKCS7_SIGN:

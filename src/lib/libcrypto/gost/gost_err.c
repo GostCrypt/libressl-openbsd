@@ -96,6 +96,7 @@ static ERR_STRING_DATA GOST_str_reasons[] = {
 	{ERR_REASON(GOST_R_SIGNATURE_MISMATCH)   ,"signature mismatch"},
 	{ERR_REASON(GOST_R_SIGNATURE_PARTS_GREATER_THAN_Q),"signature parts greater than q"},
 	{ERR_REASON(GOST_R_UKM_NOT_SET)          ,"ukm not set"},
+	{ERR_REASON(GOST_R_NO_ORIGINATOR_CERTIFICATE), "originator certificate not provided"},
 	{0, NULL}
 };
 #endif
