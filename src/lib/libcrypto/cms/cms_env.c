@@ -989,3 +989,23 @@ cms_pkey_get_ri_type(EVP_PKEY *pk)
 	}
 	return CMS_RECIPINFO_TRANS;
 }
+
+/* Some PKEYs (GOST) support different RecipientInfo types */
+int cms_pkey_is_ri_type_supported(EVP_PKEY *pk, int ri_type)
+{
+	int supportedRiType;
+
+	if (pk->ameth != NULL && pk->ameth->pkey_ctrl != NULL) {
+		int i, r;
+
+		i = pk->ameth->pkey_ctrl(pk, ASN1_PKEY_CTRL_CMS_IS_RI_TYPE_SUPPORTED, ri_type, &r);
+		if (i > 0)
+			return r;
+	}
+
+	supportedRiType = cms_pkey_get_ri_type(pk);
+	if (supportedRiType < 0)
+		return 0;
+
+	return (supportedRiType == ri_type);
+}

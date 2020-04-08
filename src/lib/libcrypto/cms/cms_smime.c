@@ -677,21 +677,19 @@ CMS_decrypt_set1_pkey(CMS_ContentInfo *cms, EVP_PKEY *pk, X509 *cert)
 {
 	STACK_OF(CMS_RecipientInfo) *ris;
 	CMS_RecipientInfo *ri;
-	int i, r, ri_type;
+	int i, r;
 	int debug = 0, match_ri = 0;
 
 	ris = CMS_get0_RecipientInfos(cms);
 	if (ris)
 		debug = cms->d.envelopedData->encryptedContentInfo->debug;
-	ri_type = cms_pkey_get_ri_type(pk);
-	if (ri_type == CMS_RECIPINFO_NONE) {
-		CMSerror(CMS_R_NOT_SUPPORTED_FOR_THIS_KEY_TYPE);
-		return 0;
-	}
 
 	for (i = 0; i < sk_CMS_RecipientInfo_num(ris); i++) {
+		int ri_type;
+
 		ri = sk_CMS_RecipientInfo_value(ris, i);
-		if (CMS_RecipientInfo_type(ri) != ri_type)
+		ri_type = CMS_RecipientInfo_type(ri);
+		if (!cms_pkey_is_ri_type_supported(pk, ri_type))
 			continue;
 		match_ri = 1;
 		if (ri_type == CMS_RECIPINFO_AGREE) {
@@ -734,7 +732,7 @@ CMS_decrypt_set1_pkey(CMS_ContentInfo *cms, EVP_PKEY *pk, X509 *cert)
 		}
 	}
 	/* If no cert, key transport and not debugging always return success */
-	if (cert == NULL && ri_type == CMS_RECIPINFO_TRANS && match_ri && !debug) {
+	if (cert == NULL && cms_pkey_get_ri_type(pk) == CMS_RECIPINFO_TRANS && match_ri && !debug) {
 		ERR_clear_error();
 		return 1;
 	}
