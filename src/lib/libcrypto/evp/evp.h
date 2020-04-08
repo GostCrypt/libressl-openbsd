@@ -865,6 +865,7 @@ const EVP_CIPHER *EVP_kuznyechik_ofb(void);
 const EVP_CIPHER *EVP_kuznyechik_ctr(void);
 const EVP_CIPHER *EVP_kuznyechik_ctr_acpkm(void);
 const EVP_CIPHER *EVP_kuznyechik_ctr_acpkm_omac(void);
+const EVP_CIPHER *EVP_kuznyechik_kexp15_wrap(void);
 const EVP_CIPHER *EVP_kuznyechik_mgm(void);
 #endif
 

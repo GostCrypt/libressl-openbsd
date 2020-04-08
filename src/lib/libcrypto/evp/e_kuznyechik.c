@@ -42,6 +42,13 @@ typedef struct {
 	unsigned char tag[16];
 } EVP_KUZNYECHIK_CTR_ACPKM_OMAC_CTX;
 
+typedef struct {
+	KUZNYECHIK_KEY ks;
+	CMAC_CTX *cmac;
+	int iv_set;
+	int key_set;
+} EVP_KUZNYECHIK_KEXP15_WRAP_CTX;
+
 static int
 kuznyechik_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
     const unsigned char *iv, int enc)
@@ -342,6 +349,131 @@ kuznyechik_ctr_acpkm_omac_get_asn1_params(EVP_CIPHER_CTX *ctx, ASN1_TYPE *params
 	return ret;
 }
 
+#define KEXP15_IV_OFFSET 24
+#define KEXP15_KUZNYECHIK_IV_PART 8
+
+static int
+kuznyechik_kexp15_wrap_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
+    const unsigned char *iv, int enc)
+{
+	EVP_KUZNYECHIK_KEXP15_WRAP_CTX *c = ctx->cipher_data;
+
+	if (iv) {
+		memset(ctx->iv, 0, sizeof(ctx->iv));
+		memcpy(ctx->iv, iv + KEXP15_IV_OFFSET, KEXP15_KUZNYECHIK_IV_PART);
+		c->iv_set = 1;
+		if (c->key_set)
+			CMAC_Update(c->cmac, iv, KEXP15_KUZNYECHIK_IV_PART);
+	}
+
+	if (key) {
+		c->key_set = 1;
+		const EVP_CIPHER *ciph = EVP_kuznyechik_cbc();
+		int kl = EVP_CIPHER_key_length(ciph);
+
+		if (!CMAC_Init(c->cmac, key, kl, ciph, NULL))
+			return 0;
+
+		if (iv != NULL)
+			CMAC_Update(c->cmac, iv, KEXP15_KUZNYECHIK_IV_PART);
+		else if (c->iv_set)
+			CMAC_Update(c->cmac, ctx->iv, KEXP15_KUZNYECHIK_IV_PART);
+
+		Kuznyechik_set_key(&c->ks, key + kl, 1);
+	}
+
+	return 1;
+}
+
+static int
+kuznyechik_kexp15_wrap_cleanup(EVP_CIPHER_CTX *ctx)
+{
+	EVP_KUZNYECHIK_KEXP15_WRAP_CTX *c = ctx->cipher_data;
+
+	CMAC_CTX_free(c->cmac);
+	c->iv_set = 0;
+	c->key_set = 0;
+
+	return 1;
+}
+
+static int
+kuznyechik_kexp15_wrap_ctl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr)
+{
+	EVP_KUZNYECHIK_KEXP15_WRAP_CTX *key = EVP_C_DATA(EVP_KUZNYECHIK_KEXP15_WRAP_CTX, ctx);
+
+	switch (type) {
+	case EVP_CTRL_INIT:
+		key->cmac = CMAC_CTX_new();
+		key->iv_set = 0;
+		key->key_set = 0;
+		return 1;
+	default:
+		return kuznyechik_ctl(ctx, type, arg, ptr);
+	}
+}
+
+static int
+kuznyechik_kexp15_wrap_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in,
+		size_t len)
+{
+	EVP_KUZNYECHIK_KEXP15_WRAP_CTX *key = EVP_C_DATA(EVP_KUZNYECHIK_KEXP15_WRAP_CTX, ctx);
+	unsigned char tmp[EVP_MAX_BLOCK_LENGTH];
+	size_t taglen = sizeof(tmp);
+	unsigned int bl = EVP_CIPHER_CTX_block_size(CMAC_CTX_get0_cipher_ctx(key->cmac));
+
+	if (in == NULL)
+		return 0;
+
+	if (len % bl != 0)
+		return -1;
+	if (ctx->encrypt && len < bl)
+		return -1;
+	if (!ctx->encrypt && len < 2 *bl)
+		return -1;
+	if (out == NULL) {
+		if (ctx->encrypt)
+			return len + bl;
+		else
+			return len - bl;
+	}
+
+	/* Do not reuse IV */
+	key->iv_set = 0;
+
+	if (ctx->encrypt) {
+		CMAC_Update(key->cmac, in, len);
+		CRYPTO_ctr128_encrypt(in, out, len, &key->ks, ctx->iv, ctx->buf,
+				&ctx->num, (block128_f)Kuznyechik_encrypt);
+		CMAC_Final(key->cmac, tmp, &taglen);
+		CRYPTO_ctr128_encrypt(tmp, out + len, taglen, &key->ks, ctx->iv, ctx->buf,
+				&ctx->num, (block128_f)Kuznyechik_encrypt);
+		return len + taglen;
+	} else {
+		CRYPTO_ctr128_encrypt(in, out, len - bl, &key->ks, ctx->iv, ctx->buf,
+				&ctx->num, (block128_f)Kuznyechik_encrypt);
+		CMAC_Update(key->cmac, out, len - bl);
+		CMAC_Final(key->cmac, tmp, &taglen);
+		CRYPTO_ctr128_encrypt(tmp, tmp, taglen, &key->ks, ctx->iv, ctx->buf,
+				&ctx->num, (block128_f)Kuznyechik_encrypt);
+		return timingsafe_memcmp(in + len - bl, tmp, bl) ? -1 : len - bl;
+	}
+}
+
+static int
+kuznyechik_kexp15_wrap_set_asn1_params(EVP_CIPHER_CTX *ctx, ASN1_TYPE *params)
+{
+	/* FIXME: set key agreement OID, we need to pass it from upper layer */
+	return 1;
+}
+
+static int
+kuznyechik_kexp15_wrap_get_asn1_params(EVP_CIPHER_CTX *ctx, ASN1_TYPE *params)
+{
+	/* No useful information in ASN.1 params */
+	return 1;
+}
+
 IMPLEMENT_BLOCK_CIPHER(kuznyechik, ks, Kuznyechik, EVP_KUZNYECHIK_CTX,
 		NID_kuznyechik, 16, 32, 16, 128, 0, kuznyechik_init_key, NULL,
 		EVP_CIPHER_set_asn1_iv,
@@ -374,6 +506,17 @@ BLOCK_CIPHER_def1(kuznyechik, ctr_acpkm_omac, ctr_acpkm_omac, CTR, EVP_KUZNYECHI
 		kuznyechik_ctr_acpkm_omac_set_asn1_params,
 		kuznyechik_ctr_acpkm_omac_get_asn1_params,
 		kuznyechik_ctr_acpkm_omac_ctl)
+
+#define NID_kuznyechik_kexp15_wrap NID_id_tc26_wrap_gostr3412_2015_kuznyechik_kexp15
+
+BLOCK_CIPHER_def1(kuznyechik, kexp15_wrap, kexp15_wrap, WRAP, EVP_KUZNYECHIK_KEXP15_WRAP_CTX,
+		NID_kuznyechik, 1, 64, 32,
+		EVP_CIPH_CUSTOM_IV | EVP_CIPH_FLAG_CUSTOM_CIPHER | EVP_CIPH_ALWAYS_CALL_INIT | EVP_CIPH_CTRL_INIT,
+		kuznyechik_kexp15_wrap_init_key,
+		kuznyechik_kexp15_wrap_cleanup,
+		kuznyechik_kexp15_wrap_set_asn1_params,
+		kuznyechik_kexp15_wrap_get_asn1_params,
+		kuznyechik_kexp15_wrap_ctl)
 
 #define EVP_AEAD_KUZNYECHIK_MGM_TAG_LEN 16
 
