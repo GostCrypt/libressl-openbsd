@@ -137,6 +137,7 @@ struct gost_pmeth_data {
 	int peer_key_used;
 	int sig_format;
 	int enc_format;
+	int derive_format;
 };
 
 static int
@@ -468,8 +469,8 @@ err:
 	return ret;
 }
 
-int
-pkey_gost01_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
+static int
+pkey_gost01_derive_4490(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
 {
 	/*
 	 * Public key of peer in the ctx field peerkey
@@ -501,6 +502,38 @@ pkey_gost01_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
 	}
 
 	*keylen = 32;
+	return 1;
+}
+
+static int
+pkey_gost01_derive_keg(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
+{
+	/*
+	 * Public key of peer in the ctx field peerkey
+	 * Our private key in the ctx pkey
+	 * ukm is in the algorithm specific context data
+	 */
+	EVP_PKEY *my_key = EVP_PKEY_CTX_get0_pkey(ctx);
+	EVP_PKEY *peer_key = EVP_PKEY_CTX_get0_peerkey(ctx);
+	struct gost_pmeth_data *data = EVP_PKEY_CTX_get_data(ctx);
+
+	if (data->shared_ukm == NULL) {
+		GOSTerror(GOST_R_UKM_NOT_SET);
+		return 0;
+	}
+
+	if (key == NULL) {
+		*keylen = 64;
+		return 64;
+	}
+
+	if (!gost_keg(peer_key, my_key, data->digest_nid, data->shared_ukm, key)) {
+		GOSTerror(GOST_R_ERROR_COMPUTING_SHARED_KEY);
+		return 0;
+	}
+
+	*keylen = 64;
+
 	return 1;
 }
 
@@ -816,6 +849,21 @@ pkey_gost01_encrypt(EVP_PKEY_CTX *ctx, unsigned char *out, size_t *out_len,
 	}
 }
 
+int
+pkey_gost01_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
+{
+	struct gost_pmeth_data *pctx = EVP_PKEY_CTX_get_data(ctx);
+
+	switch (pctx->derive_format) {
+	case GOST_DERIVE_FORMAT_4490:
+		return pkey_gost01_derive_4490(ctx, key, keylen);
+	case GOST_DERIVE_FORMAT_KEG:
+		return pkey_gost01_derive_keg(ctx, key, keylen);
+	default:
+		return -1;
+	}
+}
+
 static int
 pkey_gost01_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 {
@@ -909,6 +957,22 @@ pkey_gost01_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 			return 0;
 		}
 		pctx->enc_format = p1;
+		return 1;
+		break;
+	case EVP_PKEY_CTRL_GOST_DERIVE_FORMAT:
+		switch (p1) {
+		case GOST_DERIVE_FORMAT_4490:
+			/* All keys are supported */
+			break;
+		case GOST_DERIVE_FORMAT_KEG:
+			if (pctx->digest_nid != NID_id_tc26_gost3411_2012_256 &&
+			    pctx->digest_nid != NID_id_tc26_gost3411_2012_512)
+				return 0;
+			break;
+		default:
+			return 0;
+		}
+		pctx->derive_format = p1;
 		return 1;
 		break;
 	default:
