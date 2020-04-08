@@ -231,6 +231,9 @@ CMS_RecipientInfo_kari_set0_pkey(CMS_RecipientInfo *ri, EVP_PKEY *pk)
 	pctx = EVP_PKEY_CTX_new(pk, NULL);
 	if (!pctx || !EVP_PKEY_derive_init(pctx))
 		goto err;
+	if (kari->originator_pkey)
+		if (EVP_PKEY_derive_set_peer(pctx, kari->originator_pkey) <= 0)
+			goto err;
 	kari->pctx = pctx;
 	return 1;
 

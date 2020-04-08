@@ -278,6 +278,7 @@ static ERR_STRING_DATA CMS_str_reasons[] = {
 	{ERR_PACK(ERR_LIB_CMS, 0, CMS_R_VERIFICATION_FAILURE),
 	"verification failure"},
 	{ERR_PACK(ERR_LIB_CMS, 0, CMS_R_WRAP_ERROR), "wrap error"},
+	{ERR_PACK(ERR_LIB_CMS, 0, CMS_R_NO_MATCHING_ORIGINATOR), "no matching originator"},
 	{0, NULL}
 };
 

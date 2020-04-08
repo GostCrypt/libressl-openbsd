@@ -209,6 +209,8 @@ struct CMS_KeyAgreeRecipientInfo_st {
 	EVP_PKEY_CTX *pctx;
 	/* Cipher context for CEK wrapping */
 	EVP_CIPHER_CTX *ctx;
+	/* Originator's public key */
+	EVP_PKEY *originator_pkey;
 };
 
 struct CMS_OriginatorIdentifierOrKey_st {

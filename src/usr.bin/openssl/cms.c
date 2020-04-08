@@ -947,6 +947,19 @@ cms_main(int argc, char **argv)
 		if (flags & CMS_DEBUG_DECRYPT)
 			CMS_decrypt(cms, NULL, NULL, NULL, NULL, flags);
 
+		if (other) {
+			int i;
+			X509 *x;
+
+			for (i = 0; i < sk_X509_num(other); i++) {
+				x = sk_X509_value(other, i);
+				if (!CMS_decrypt_set1_originator(cms, x)) {
+					BIO_puts(bio_err,"Error setting CMS originator certificate\n");
+					goto end;
+				}
+			}
+		}
+
 		if (secret_key) {
 			if (!CMS_decrypt_set1_key(cms, secret_key,
 			    secret_keylen, secret_keyid, secret_keyidlen)) {

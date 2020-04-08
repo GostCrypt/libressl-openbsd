@@ -627,6 +627,7 @@ CMS_dataInit
 CMS_data_create
 CMS_decrypt
 CMS_decrypt_set1_key
+CMS_decrypt_set1_originator
 CMS_decrypt_set1_password
 CMS_decrypt_set1_pkey
 CMS_digest_create
