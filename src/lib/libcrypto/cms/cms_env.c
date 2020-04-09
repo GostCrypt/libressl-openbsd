@@ -245,6 +245,7 @@ CMS_add1_recipient_cert(CMS_ContentInfo *cms, X509 *recip,
 	CMS_RecipientInfo *ri = NULL;
 	CMS_EnvelopedData *env;
 	EVP_PKEY *pk = NULL;
+	int ri_type;
 
 	env = cms_get0_enveloped(cms);
 	if (!env)
@@ -261,7 +262,13 @@ CMS_add1_recipient_cert(CMS_ContentInfo *cms, X509 *recip,
 		goto err;
 	}
 
-	switch (cms_pkey_get_ri_type(pk)) {
+	if (originator && originator_pkey &&
+	    cms_pkey_is_ri_type_supported(pk, CMS_RECIPINFO_AGREE))
+		ri_type = CMS_RECIPINFO_AGREE;
+	else
+		ri_type = cms_pkey_get_ri_type(pk);
+
+	switch (ri_type) {
 
 	case CMS_RECIPINFO_TRANS:
 		if (!cms_RecipientInfo_ktri_init(ri, recip, pk, flags))
