@@ -832,7 +832,10 @@ ecdh_cms_encrypt(CMS_RecipientInfo *ri)
 	if (!CMS_RecipientInfo_kari_get0_orig_id(ri, &talg, &pubkey,
 	    NULL, NULL, NULL))
 		goto err;
-	X509_ALGOR_get0(&aoid, NULL, NULL, talg);
+	if (talg == NULL)
+		aoid = NULL;
+	else
+		X509_ALGOR_get0(&aoid, NULL, NULL, talg);
 
 	/* Is everything uninitialised? */
 	if (aoid == OBJ_nid2obj(NID_undef)) {

@@ -125,6 +125,7 @@ int CMS_ContentInfo_print_ctx(BIO *out, CMS_ContentInfo *x, int indent, const AS
 #define CMS_DEBUG_DECRYPT               0x20000
 #define CMS_KEY_PARAM                   0x40000
 #define CMS_ASCIICRLF                   0x80000
+#define CMS_USE_ORIGINATOR_KEYID	0x100000
 
 const ASN1_OBJECT *CMS_get0_type(const CMS_ContentInfo *cms);
 
@@ -188,7 +189,9 @@ int CMS_verify_receipt(CMS_ContentInfo *rcms, CMS_ContentInfo *ocms,
 STACK_OF(X509) *CMS_get0_signers(CMS_ContentInfo *cms);
 
 CMS_ContentInfo *CMS_encrypt(STACK_OF(X509) *certs, BIO *in,
-    const EVP_CIPHER *cipher, unsigned int flags);
+    const EVP_CIPHER *cipher,
+    EVP_PKEY *originator_pkey, X509 *originator,
+    unsigned int flags);
 
 int CMS_decrypt(CMS_ContentInfo *cms, EVP_PKEY *pkey, X509 *cert,
     BIO *dcont, BIO *out, unsigned int flags);
@@ -205,6 +208,7 @@ int CMS_RecipientInfo_type(CMS_RecipientInfo *ri);
 EVP_PKEY_CTX *CMS_RecipientInfo_get0_pkey_ctx(CMS_RecipientInfo *ri);
 CMS_ContentInfo *CMS_EnvelopedData_create(const EVP_CIPHER *cipher);
 CMS_RecipientInfo *CMS_add1_recipient_cert(CMS_ContentInfo *cms, X509 *recip,
+    EVP_PKEY *originator_pkey, X509 *originator,
     unsigned int flags);
 int CMS_RecipientInfo_set0_pkey(CMS_RecipientInfo *ri, EVP_PKEY *pkey);
 int CMS_RecipientInfo_ktri_cert_cmp(CMS_RecipientInfo *ri, X509 *cert);

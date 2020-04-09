@@ -143,7 +143,7 @@ test_cms_encrypt_decrypt()
 	if ((bio_mem = BIO_new_mem_buf(cms_msg, -1)) == NULL)
 		errx(1, "failed to create BIO for message");
 
-	if ((ci = CMS_encrypt(certs, bio_mem, EVP_aes_256_cbc(), 0)) == NULL) {
+	if ((ci = CMS_encrypt(certs, bio_mem, EVP_aes_256_cbc(), NULL, NULL, 0)) == NULL) {
 		fprintf(stderr, "FAIL: CMS_encrypt returned NULL\n");
 		ERR_print_errors_fp(stderr);
 		goto failure;
