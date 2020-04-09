@@ -246,6 +246,8 @@ cms_main(int argc, char **argv)
 			flags |= CMS_BINARY;
 		else if (!strcmp(*args, "-keyid"))
 			flags |= CMS_USE_KEYID;
+		else if (!strcmp(*args, "-origkeyid"))
+			flags |= CMS_USE_ORIGINATOR_KEYID;
 		else if (!strcmp(*args, "-nosigs"))
 			flags |= CMS_NOSIGS;
 		else if (!strcmp(*args, "-no_content_verify"))
@@ -590,6 +592,7 @@ cms_main(int argc, char **argv)
 		BIO_printf(bio_err, "-signer file   signer certificate file\n");
 		BIO_printf(bio_err, "-recip  file   recipient certificate file for decryption\n");
 		BIO_printf(bio_err, "-keyid         use subject key identifier\n");
+		BIO_printf(bio_err, "-origkeyid     use originator's key identifier\n");
 		BIO_printf(bio_err, "-in file       input file\n");
 		BIO_printf(bio_err, "-inform arg    input format SMIME (default), PEM or DER\n");
 		BIO_printf(bio_err, "-inkey file    input private key (if not signer or recipient)\n");
@@ -686,6 +689,9 @@ cms_main(int argc, char **argv)
 	if (operation == SMIME_DECRYPT) {
 		if (!keyfile)
 			keyfile = recipfile;
+	} else if (operation == SMIME_ENCRYPT) {
+		if (!keyfile)
+			keyfile = certfile;
 	} else if ((operation == SMIME_SIGN) ||
 	    (operation == SMIME_SIGN_RECEIPT)) {
 		if (!keyfile)
@@ -797,8 +803,23 @@ cms_main(int argc, char **argv)
 		cms = CMS_compress(in, -1, flags);
 	} else if (operation == SMIME_ENCRYPT) {
 		int i;
+		X509 *orig = NULL;
+		if (other) {
+			if (!key) {
+				BIO_puts(bio_err,"Must specify CMS originator private key\n");
+				goto end;
+			}
+			if (sk_X509_num(other) != 1) {
+				BIO_puts(bio_err,"Must specify only CMS originator certificate\n");
+				goto end;
+			}
+			orig = sk_X509_value(other, 0);
+		} else if (key) {
+			BIO_puts(bio_err,"Must specify only CMS originator certificate (-certfile)\n");
+			goto end;
+		}
 		flags |= CMS_PARTIAL;
-		cms = CMS_encrypt(NULL, in, cipher, flags);
+		cms = CMS_encrypt(NULL, in, cipher, key, orig, flags);
 		if (cms == NULL)
 			goto end;
 		for (i = 0; i < sk_X509_num(encerts); i++) {
@@ -812,7 +833,7 @@ cms_main(int argc, char **argv)
 					break;
 				}
 			}
-			ri = CMS_add1_recipient_cert(cms, x, tflags);
+			ri = CMS_add1_recipient_cert(cms, x, key, orig, tflags);
 			if (ri == NULL)
 				goto end;
 			if (kparam != NULL) {

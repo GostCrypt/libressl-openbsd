@@ -362,10 +362,33 @@ cms_kari_create_ephemeral_key(CMS_KeyAgreeRecipientInfo *kari, EVP_PKEY *pk)
 	return rv;
 }
 
+/* Set the key from originator */
+static int
+cms_kari_set_originator_priv_key(CMS_KeyAgreeRecipientInfo *kari, EVP_PKEY *pk)
+{
+	EVP_PKEY_CTX *pctx = NULL;
+	int rv = 0;
+
+	pctx = EVP_PKEY_CTX_new(pk, NULL);
+	if (!pctx)
+		goto err;
+	if (EVP_PKEY_derive_init(pctx) <= 0)
+		goto err;
+	kari->pctx = pctx;
+	rv = 1;
+
+ err:
+	if (!rv)
+		EVP_PKEY_CTX_free(pctx);
+
+	return rv;
+}
+
 /* Initialise a kari based on passed certificate and key */
 
 int
 cms_RecipientInfo_kari_init(CMS_RecipientInfo *ri, X509 *recip, EVP_PKEY *pk,
+    X509 *originator, EVP_PKEY *originator_pkey,
     unsigned int flags)
 {
 	CMS_KeyAgreeRecipientInfo *kari;
@@ -401,9 +424,25 @@ cms_RecipientInfo_kari_init(CMS_RecipientInfo *ri, X509 *recip, EVP_PKEY *pk,
 			return 0;
 	}
 
-	/* Create ephemeral key */
-	if (!cms_kari_create_ephemeral_key(kari, pk))
-		return 0;
+	if (originator_pkey == NULL && originator == NULL) {
+		/* Create ephemeral key */
+		if (!cms_kari_create_ephemeral_key(kari, pk))
+			return 0;
+	} else {
+		CMS_OriginatorIdentifierOrKey *oik = ri->d.kari->originator;
+
+		if (flags & CMS_USE_ORIGINATOR_KEYID) {
+			oik->type = CMS_OIK_KEYIDENTIFIER;
+			if (!cms_set1_keyid(&oik->d.subjectKeyIdentifier, originator))
+				return 0;
+		} else {
+			oik->type = CMS_OIK_ISSUER_SERIAL;
+			if (!cms_set1_ias(&oik->d.issuerAndSerialNumber, originator))
+				return 0;
+		}
+		if (!cms_kari_set_originator_priv_key(kari, originator_pkey))
+			return 0;
+	}
 
 	EVP_PKEY_up_ref(pk);
 	rek->pkey = pk;

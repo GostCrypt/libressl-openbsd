@@ -612,6 +612,7 @@ CMS_sign_receipt(CMS_SignerInfo *si, X509 *signcert, EVP_PKEY *pkey,
 
 CMS_ContentInfo *
 CMS_encrypt(STACK_OF(X509) *certs, BIO *data, const EVP_CIPHER *cipher,
+    EVP_PKEY *originator_pkey, X509 *originator,
     unsigned int flags)
 {
 	CMS_ContentInfo *cms;
@@ -623,7 +624,7 @@ CMS_encrypt(STACK_OF(X509) *certs, BIO *data, const EVP_CIPHER *cipher,
 		goto merr;
 	for (i = 0; i < sk_X509_num(certs); i++) {
 		recip = sk_X509_value(certs, i);
-		if (!CMS_add1_recipient_cert(cms, recip, flags)) {
+		if (!CMS_add1_recipient_cert(cms, recip, originator_pkey, originator, flags)) {
 			CMSerror(CMS_R_RECIPIENT_ERROR);
 			goto err;
 		}

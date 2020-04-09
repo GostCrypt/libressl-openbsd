@@ -465,7 +465,8 @@ int cms_pkey_get_ri_type(EVP_PKEY *pk);
 int cms_pkey_is_ri_type_supported(EVP_PKEY *pk, int ri_type);
 /* KARI routines */
 int cms_RecipientInfo_kari_init(CMS_RecipientInfo *ri, X509 *recip,
-    EVP_PKEY *pk, unsigned int flags);
+    EVP_PKEY *pk, X509 *originator, EVP_PKEY *originator_pkey,
+    unsigned int flags);
 int cms_RecipientInfo_kari_encrypt(CMS_ContentInfo *cms, CMS_RecipientInfo *ri);
 
 /* PWRI routines */

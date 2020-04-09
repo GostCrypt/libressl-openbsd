@@ -238,7 +238,9 @@ cms_RecipientInfo_ktri_init(CMS_RecipientInfo *ri, X509 *recip, EVP_PKEY *pk,
  */
 
 CMS_RecipientInfo *
-CMS_add1_recipient_cert(CMS_ContentInfo *cms, X509 *recip, unsigned int flags)
+CMS_add1_recipient_cert(CMS_ContentInfo *cms, X509 *recip,
+    EVP_PKEY *originator_pkey, X509 *originator,
+    unsigned int flags)
 {
 	CMS_RecipientInfo *ri = NULL;
 	CMS_EnvelopedData *env;
@@ -267,7 +269,7 @@ CMS_add1_recipient_cert(CMS_ContentInfo *cms, X509 *recip, unsigned int flags)
 		break;
 
 	case CMS_RECIPINFO_AGREE:
-		if (!cms_RecipientInfo_kari_init(ri, recip, pk, flags))
+		if (!cms_RecipientInfo_kari_init(ri, recip, pk, originator, originator_pkey, flags))
 			goto err;
 		break;
 
