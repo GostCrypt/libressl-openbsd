@@ -328,9 +328,9 @@ ssl3_accept(SSL *s)
 				 * stateless while listening.
 				 */
 				if (listen) {
-					memcpy(S3I(s)->write_sequence,
-					    S3I(s)->read_sequence,
-					    sizeof(S3I(s)->write_sequence));
+					memcpy(S3I(s)->write.sequence,
+					    S3I(s)->read.sequence,
+					    sizeof(S3I(s)->write.sequence));
 				}
 
 				/* If we're just listening, stop here */

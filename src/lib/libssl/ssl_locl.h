@@ -801,13 +801,15 @@ typedef struct ssl3_buffer_internal_st {
 	int left;		/* how many bytes left */
 } SSL3_BUFFER_INTERNAL;
 
+typedef struct ssl3_rw_state_internal_st {
+	unsigned char sequence[SSL3_SEQUENCE_SIZE];
+	int mac_secret_size;
+	unsigned char mac_secret[EVP_MAX_MD_SIZE];
+} SSL3_RW_STATE_INTERNAL;
+
 typedef struct ssl3_state_internal_st {
-	unsigned char read_sequence[SSL3_SEQUENCE_SIZE];
-	int read_mac_secret_size;
-	unsigned char read_mac_secret[EVP_MAX_MD_SIZE];
-	unsigned char write_sequence[SSL3_SEQUENCE_SIZE];
-	int write_mac_secret_size;
-	unsigned char write_mac_secret[EVP_MAX_MD_SIZE];
+	SSL3_RW_STATE_INTERNAL read;
+	SSL3_RW_STATE_INTERNAL write;
 
 	SSL3_BUFFER_INTERNAL rbuf;	/* read IO goes into here */
 	SSL3_BUFFER_INTERNAL wbuf;	/* write IO goes into here */

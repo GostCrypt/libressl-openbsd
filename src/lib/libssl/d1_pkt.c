@@ -208,7 +208,7 @@ dtls1_copy_record(SSL *s, pitem *item)
 	memcpy(&(S3I(s)->rrec), &(rdata->rrec), sizeof(SSL3_RECORD_INTERNAL));
 
 	/* Set proper sequence number for mac calculation */
-	memcpy(&(S3I(s)->read_sequence[2]), &(rdata->packet[5]), 6);
+	memcpy(&(S3I(s)->read.sequence[2]), &(rdata->packet[5]), 6);
 
 	return (1);
 }
@@ -520,8 +520,8 @@ again:
 		    !CBS_get_bytes(&header, &seq_no, 6))
 			goto again;
 
-		if (!CBS_write_bytes(&seq_no, &(S3I(s)->read_sequence[2]),
-		    sizeof(S3I(s)->read_sequence) - 2, NULL))
+		if (!CBS_write_bytes(&seq_no, &(S3I(s)->read.sequence[2]),
+		    sizeof(S3I(s)->read.sequence) - 2, NULL))
 			goto again;
 		if (!CBS_get_u16(&header, &len))
 			goto again;
@@ -1232,7 +1232,7 @@ do_dtls1_write(SSL *s, int type, const unsigned char *buf, unsigned int len)
 		goto err;
 	if (!CBB_add_u16(&cbb, D1I(s)->w_epoch))
 		goto err;
-	if (!CBB_add_bytes(&cbb, &(S3I(s)->write_sequence[2]), 6))
+	if (!CBB_add_bytes(&cbb, &(S3I(s)->write.sequence[2]), 6))
 		goto err;
 
 	p += DTLS1_RT_HEADER_LENGTH;
@@ -1296,7 +1296,7 @@ do_dtls1_write(SSL *s, int type, const unsigned char *buf, unsigned int len)
 	wr->type = type; /* not needed but helps for debugging */
 	wr->length += DTLS1_RT_HEADER_LENGTH;
 
-	tls1_record_sequence_increment(S3I(s)->write_sequence);
+	tls1_record_sequence_increment(S3I(s)->write.sequence);
 
 	/* now let's set up wb */
 	wb->left = wr->length;
@@ -1324,7 +1324,7 @@ dtls1_record_replay_check(SSL *s, DTLS1_BITMAP *bitmap)
 {
 	int cmp;
 	unsigned int shift;
-	const unsigned char *seq = S3I(s)->read_sequence;
+	const unsigned char *seq = S3I(s)->read.sequence;
 
 	cmp = satsub64be(seq, bitmap->max_seq_num);
 	if (cmp > 0) {
@@ -1347,7 +1347,7 @@ dtls1_record_bitmap_update(SSL *s, DTLS1_BITMAP *bitmap)
 {
 	int cmp;
 	unsigned int shift;
-	const unsigned char *seq = S3I(s)->read_sequence;
+	const unsigned char *seq = S3I(s)->read.sequence;
 
 	cmp = satsub64be(seq, bitmap->max_seq_num);
 	if (cmp > 0) {
@@ -1429,16 +1429,16 @@ void
 dtls1_reset_seq_numbers(SSL *s, int rw)
 {
 	unsigned char *seq;
-	unsigned int seq_bytes = sizeof(S3I(s)->read_sequence);
+	unsigned int seq_bytes = sizeof(S3I(s)->read.sequence);
 
 	if (rw & SSL3_CC_READ) {
-		seq = S3I(s)->read_sequence;
+		seq = S3I(s)->read.sequence;
 		D1I(s)->r_epoch++;
 		memcpy(&(D1I(s)->bitmap), &(D1I(s)->next_bitmap), sizeof(DTLS1_BITMAP));
 		memset(&(D1I(s)->next_bitmap), 0x00, sizeof(DTLS1_BITMAP));
 	} else {
-		seq = S3I(s)->write_sequence;
-		memcpy(D1I(s)->last_write_sequence, seq, sizeof(S3I(s)->write_sequence));
+		seq = S3I(s)->write.sequence;
+		memcpy(D1I(s)->last_write_sequence, seq, sizeof(S3I(s)->write.sequence));
 		D1I(s)->w_epoch++;
 	}
 
