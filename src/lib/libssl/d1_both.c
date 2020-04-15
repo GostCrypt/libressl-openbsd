@@ -1084,10 +1084,10 @@ dtls1_retransmit_message(SSL *s, unsigned short seq, unsigned long frag_off,
 
 	if (frag->msg_header.saved_retransmit_state.epoch ==
 	    saved_state.epoch - 1) {
-		memcpy(save_write_sequence, S3I(s)->write_sequence,
-		    sizeof(S3I(s)->write_sequence));
-		memcpy(S3I(s)->write_sequence, D1I(s)->last_write_sequence,
-		    sizeof(S3I(s)->write_sequence));
+		memcpy(save_write_sequence, S3I(s)->write.sequence,
+		    sizeof(S3I(s)->write.sequence));
+		memcpy(S3I(s)->write.sequence, D1I(s)->last_write_sequence,
+		    sizeof(S3I(s)->write.sequence));
 	}
 
 	ret = dtls1_do_write(s, frag->msg_header.is_ccs ?
@@ -1101,10 +1101,10 @@ dtls1_retransmit_message(SSL *s, unsigned short seq, unsigned long frag_off,
 
 	if (frag->msg_header.saved_retransmit_state.epoch ==
 	    saved_state.epoch - 1) {
-		memcpy(D1I(s)->last_write_sequence, S3I(s)->write_sequence,
-		    sizeof(S3I(s)->write_sequence));
-		memcpy(S3I(s)->write_sequence, save_write_sequence,
-		    sizeof(S3I(s)->write_sequence));
+		memcpy(D1I(s)->last_write_sequence, S3I(s)->write.sequence,
+		    sizeof(S3I(s)->write.sequence));
+		memcpy(S3I(s)->write.sequence, save_write_sequence,
+		    sizeof(S3I(s)->write.sequence));
 	}
 
 	D1I(s)->retransmitting = 0;

@@ -510,6 +510,7 @@ tls1_change_cipher_state(SSL *s, int which)
 	const EVP_CIPHER *cipher;
 	const EVP_AEAD *aead;
 	char is_read, use_client_keys;
+	SSL3_RW_STATE_INTERNAL *rws;
 
 	cipher = S3I(s)->tmp.new_sym_enc;
 	aead = S3I(s)->tmp.new_aead;
@@ -520,6 +521,7 @@ tls1_change_cipher_state(SSL *s, int which)
 	 * just written one.
 	 */
 	is_read = (which & SSL3_CC_READ) != 0;
+	rws = is_read ? &S3I(s)->read : &S3I(s)->write;
 
 	/*
 	 * use_client_keys is true if we wish to use the keys for the "client
@@ -534,7 +536,7 @@ tls1_change_cipher_state(SSL *s, int which)
 	 * dtls1_reset_seq_numbers().
 	 */
 	if (!SSL_IS_DTLS(s)) {
-		seq = is_read ? S3I(s)->read_sequence : S3I(s)->write_sequence;
+		seq = rws->sequence;
 		memset(seq, 0, SSL3_SEQUENCE_SIZE);
 	}
 
@@ -577,13 +579,8 @@ tls1_change_cipher_state(SSL *s, int which)
 		goto err2;
 	}
 
-	if (is_read) {
-		memcpy(S3I(s)->read_mac_secret, mac_secret, mac_secret_size);
-		S3I(s)->read_mac_secret_size = mac_secret_size;
-	} else {
-		memcpy(S3I(s)->write_mac_secret, mac_secret, mac_secret_size);
-		S3I(s)->write_mac_secret_size = mac_secret_size;
-	}
+	memcpy(rws->mac_secret, mac_secret, mac_secret_size);
+	rws->mac_secret_size = mac_secret_size;
 
 	if (aead != NULL) {
 		return tls1_change_cipher_state_aead(s, is_read, key, key_len,
@@ -700,11 +697,11 @@ tls1_enc(SSL *s, int send)
 	if (send) {
 		aead = s->internal->aead_write_ctx;
 		rec = &S3I(s)->wrec;
-		seq = S3I(s)->write_sequence;
+		seq = S3I(s)->write.sequence;
 	} else {
 		aead = s->internal->aead_read_ctx;
 		rec = &S3I(s)->rrec;
-		seq = S3I(s)->read_sequence;
+		seq = S3I(s)->read.sequence;
 	}
 
 	if (aead) {
@@ -968,12 +965,12 @@ tls1_mac(SSL *ssl, unsigned char *md, int send)
 
 	if (send) {
 		rec = &(ssl->s3->internal->wrec);
-		seq = &(ssl->s3->internal->write_sequence[0]);
+		seq = &(ssl->s3->internal->write.sequence[0]);
 		hash = ssl->internal->write_hash;
 		t = ssl->internal->write_mac_size;
 	} else {
 		rec = &(ssl->s3->internal->rrec);
-		seq = &(ssl->s3->internal->read_sequence[0]);
+		seq = &(ssl->s3->internal->read.sequence[0]);
 		hash = ssl->read_hash;
 		t = ssl->read_mac_size;
 	}
@@ -1014,8 +1011,8 @@ tls1_mac(SSL *ssl, unsigned char *md, int send)
 		if (!ssl3_cbc_digest_record(mac_ctx,
 		    md, &md_size, header, rec->input,
 		    rec->length + md_size, orig_len,
-		    ssl->s3->internal->read_mac_secret,
-		    ssl->s3->internal->read_mac_secret_size))
+		    ssl->s3->internal->read.mac_secret,
+		    ssl->s3->internal->read.mac_secret_size))
 			return -1;
 	} else {
 		EVP_DigestSignUpdate(mac_ctx, header, sizeof(header));
