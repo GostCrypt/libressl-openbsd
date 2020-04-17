@@ -729,10 +729,6 @@ typedef struct ssl_internal_st {
 	/* crypto */
 	STACK_OF(SSL_CIPHER) *cipher_list_by_id;
 
-	/* These are the ones being used, the ones in SSL_SESSION are
-	 * the ones to be 'copied' into these ones */
-	int mac_flags;
-
 	SSL_AEAD_CTX *aead_read_ctx;	/* AEAD context. If non-NULL, then
 					   enc_read_ctx and read_hash are
 					   ignored. */
