@@ -549,6 +549,7 @@ pkey_gost01_encrypt_4490(EVP_PKEY_CTX *pctx, unsigned char *out, size_t *out_len
 	int key_is_ephemeral;
 	EVP_PKEY *sec_key = EVP_PKEY_CTX_get0_peerkey(pctx);
 	int nid;
+	int tmp_len;
 
 	if (GOST_KEY_get_digest(pubk->pkey.gost) ==
 			NID_id_GostR3411_94_CryptoProParamSet)
@@ -635,7 +636,15 @@ pkey_gost01_encrypt_4490(EVP_PKEY_CTX *pctx, unsigned char *out, size_t *out_len
 			goto err;
 		}
 	}
-	if ((*out_len = i2d_GOST_KEY_TRANSPORT(gkt, out ? &out : NULL)) > 0)
+	tmp_len = i2d_GOST_KEY_TRANSPORT(gkt, NULL);
+	if (!out) {
+		*out_len = tmp_len;
+	} else {
+		if (*out_len < tmp_len)
+			goto err;
+		*out_len = i2d_GOST_KEY_TRANSPORT(gkt, &out);
+	}
+	if (out_len > 0)
 		ret = 1;
 	GOST_KEY_TRANSPORT_free(gkt);
 	return ret;
