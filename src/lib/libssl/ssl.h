@@ -796,9 +796,6 @@ void SSL_get0_alpn_selected(const SSL *ssl, const unsigned char **data,
 #define SSL_want_write(s)	(SSL_want(s) == SSL_WRITING)
 #define SSL_want_x509_lookup(s)	(SSL_want(s) == SSL_X509_LOOKUP)
 
-#define SSL_MAC_FLAG_READ_MAC_STREAM 1
-#define SSL_MAC_FLAG_WRITE_MAC_STREAM 2
-
 #ifndef OPENSSL_NO_SSL_INTERN
 struct ssl_internal_st;
 

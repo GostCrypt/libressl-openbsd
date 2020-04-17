@@ -418,11 +418,6 @@ tls1_change_cipher_state_cipher(SSL *s, char is_read,
 	mac_type = S3I(s)->tmp.new_mac_pkey_type;
 
 	if (is_read) {
-		if (S3I(s)->hs.new_cipher->algorithm2 & TLS1_STREAM_MAC)
-			s->internal->mac_flags |= SSL_MAC_FLAG_READ_MAC_STREAM;
-		else
-			s->internal->mac_flags &= ~SSL_MAC_FLAG_READ_MAC_STREAM;
-
 		ssl_clear_cipher_read_state(s);
 
 		if ((cipher_ctx = EVP_CIPHER_CTX_new()) == NULL)
@@ -432,11 +427,6 @@ tls1_change_cipher_state_cipher(SSL *s, char is_read,
 			goto err;
 		s->read_hash = mac_ctx;
 	} else {
-		if (S3I(s)->hs.new_cipher->algorithm2 & TLS1_STREAM_MAC)
-			s->internal->mac_flags |= SSL_MAC_FLAG_WRITE_MAC_STREAM;
-		else
-			s->internal->mac_flags &= ~SSL_MAC_FLAG_WRITE_MAC_STREAM;
-
 		/*
 		 * DTLS fragments retain a pointer to the compression, cipher
 		 * and hash contexts, so that it can restore state in order
@@ -958,9 +948,9 @@ tls1_mac(SSL *ssl, unsigned char *md, int send)
 	size_t md_size, orig_len;
 	EVP_MD_CTX hmac, *mac_ctx;
 	unsigned char header[13];
-	int stream_mac = (send ?
-	    (ssl->internal->mac_flags & SSL_MAC_FLAG_WRITE_MAC_STREAM) :
-	    (ssl->internal->mac_flags & SSL_MAC_FLAG_READ_MAC_STREAM));
+	int stream_mac = ssl->session && ssl->session->cipher ?
+		ssl->session->cipher->algorithm2 & TLS1_STREAM_MAC :
+		0;
 	int t;
 
 	if (send) {
