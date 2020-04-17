@@ -288,6 +288,7 @@ __BEGIN_HIDDEN_DECLS
  * (currently this also goes into algorithm2).
  */
 #define TLS1_STREAM_MAC 0x04
+#define TLS1_NONCE_ADD_SEQUENCE 0x02
 
 /*
  * SSL_CIPHER_ALGORITHM2_VARIABLE_NONCE_IN_RECORD is an algorithm2 flag that
@@ -814,6 +815,8 @@ typedef struct ssl3_rw_state_internal_st {
 	unsigned char sequence[SSL3_SEQUENCE_SIZE];
 	int mac_secret_size;
 	unsigned char mac_secret[EVP_MAX_MD_SIZE];
+	int cipher_iv_size;
+	unsigned char cipher_iv[EVP_MAX_IV_LENGTH];
 } SSL3_RW_STATE_INTERNAL;
 
 typedef struct ssl3_state_internal_st {

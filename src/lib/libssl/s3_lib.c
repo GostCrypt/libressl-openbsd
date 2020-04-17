@@ -1316,7 +1316,7 @@ SSL_CIPHER ssl3_ciphers[] = {
 		.algorithm_mac = SSL_KUZNYECHIK_OMAC,
 		.algorithm_ssl = SSL_TLSV1_2,
 		.algo_strength = SSL_HIGH,
-		.algorithm2 = SSL_HANDSHAKE_MAC_STREEBOG256|TLS1_PRF_STREEBOG256,
+		.algorithm2 = SSL_HANDSHAKE_MAC_STREEBOG256|TLS1_PRF_STREEBOG256|TLS1_NONCE_ADD_SEQUENCE,
 		.strength_bits = 256,
 		.alg_bits = 256
 	},
@@ -1332,7 +1332,7 @@ SSL_CIPHER ssl3_ciphers[] = {
 		.algorithm_mac = SSL_MAGMA_OMAC,
 		.algorithm_ssl = SSL_TLSV1_2,
 		.algo_strength = SSL_HIGH,
-		.algorithm2 = SSL_HANDSHAKE_MAC_STREEBOG256|TLS1_PRF_STREEBOG256,
+		.algorithm2 = SSL_HANDSHAKE_MAC_STREEBOG256|TLS1_PRF_STREEBOG256|TLS1_NONCE_ADD_SEQUENCE,
 		.strength_bits = 256,
 		.alg_bits = 256
 	},

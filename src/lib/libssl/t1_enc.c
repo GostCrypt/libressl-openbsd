@@ -571,6 +571,8 @@ tls1_change_cipher_state(SSL *s, int which)
 
 	memcpy(rws->mac_secret, mac_secret, mac_secret_size);
 	rws->mac_secret_size = mac_secret_size;
+	memcpy(rws->cipher_iv, iv, iv_len);
+	rws->cipher_iv_size = iv_len;
 
 	if (aead != NULL) {
 		return tls1_change_cipher_state_aead(s, is_read, key, key_len,
@@ -680,18 +682,21 @@ tls1_enc(SSL *s, int send)
 	const EVP_CIPHER *enc;
 	EVP_CIPHER_CTX *ds;
 	SSL3_RECORD_INTERNAL *rec;
-	unsigned char *seq;
+	SSL3_RW_STATE_INTERNAL *rws;
 	unsigned long l;
 	int bs, i, j, k, ret, mac_size = 0;
+	int add_nonce = s->session && s->session->cipher ?
+		s->session->cipher->algorithm2 & TLS1_NONCE_ADD_SEQUENCE:
+		0;
 
 	if (send) {
 		aead = s->internal->aead_write_ctx;
 		rec = &S3I(s)->wrec;
-		seq = S3I(s)->write.sequence;
+		rws = &S3I(s)->write;
 	} else {
 		aead = s->internal->aead_read_ctx;
 		rec = &S3I(s)->rrec;
-		seq = S3I(s)->read.sequence;
+		rws = &S3I(s)->read;
 	}
 
 	if (aead) {
@@ -700,11 +705,11 @@ tls1_enc(SSL *s, int send)
 		unsigned int nonce_used;
 
 		if (SSL_IS_DTLS(s)) {
-			dtls1_build_sequence_number(ad, seq,
+			dtls1_build_sequence_number(ad, rws->sequence,
 			    send ? D1I(s)->w_epoch : D1I(s)->r_epoch);
 		} else {
-			memcpy(ad, seq, SSL3_SEQUENCE_SIZE);
-			tls1_record_sequence_increment(seq);
+			memcpy(ad, rws->sequence, SSL3_SEQUENCE_SIZE);
+			tls1_record_sequence_increment(rws->sequence);
 		}
 
 		ad[8] = rec->type;
@@ -899,6 +904,24 @@ tls1_enc(SSL *s, int send)
 				return 0;
 		}
 
+		if (add_nonce) {
+			unsigned char new_iv[EVP_MAX_IV_LENGTH];
+			int iv_size = rws->cipher_iv_size;
+			unsigned char cf = 0, tmp;
+
+			for (i = 1; i <= iv_size; i++) {
+				tmp = new_iv[iv_size - i] =
+					rws->cipher_iv[iv_size - i] + rws->sequence[SSL3_SEQUENCE_SIZE - i] + cf;
+				if (tmp != rws->cipher_iv[iv_size - i])
+					cf = (tmp < rws->cipher_iv[iv_size - i]);
+			}
+
+			if (!EVP_CipherInit_ex(ds, NULL, NULL, NULL, new_iv, -1)) {
+				SSLerror(s, ERR_R_EVP_LIB);
+				return -1;
+			}
+		}
+
 		i = EVP_Cipher(ds, rec->data, rec->input, l);
 		if ((EVP_CIPHER_flags(ds->cipher) &
 		    EVP_CIPH_FLAG_CUSTOM_CIPHER) ? (i < 0) : (i == 0))
@@ -1013,9 +1036,6 @@ tls1_mac(SSL *ssl, unsigned char *md, int send)
 
 	if (!stream_mac)
 		EVP_MD_CTX_cleanup(&hmac);
-
-	if (!SSL_IS_DTLS(ssl))
-		tls1_record_sequence_increment(seq);
 
 	return (md_size);
 }
