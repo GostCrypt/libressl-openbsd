@@ -485,6 +485,7 @@ ssl3_get_record(SSL *s)
 		}
 
 		i = tls1_mac(s,md,0 /* not send */);
+		tls1_record_sequence_increment(S3I(s)->read.sequence);
 		if (i < 0 || mac == NULL ||
 		    timingsafe_memcmp(md, mac, (size_t)mac_size) != 0)
 			enc_err = -1;
@@ -701,6 +702,12 @@ ssl3_create_record(SSL *s, unsigned char *p, int type, const unsigned char *buf,
 
 	/* tls1_enc can only have an error on read */
 	tls1_enc(s, 1);
+
+	/* Increment sequence after encrypting so that tls1_enc can use seq for
+	 * nonce calculation */
+	if (mac_size != 0) {
+		tls1_record_sequence_increment(S3I(s)->write.sequence);
+	}
 
 	/* record length after mac and block padding */
 	if (!CBB_add_u16(&cbb, wr->length))
