@@ -103,6 +103,19 @@ Kuznyechik_ofb128_encrypt(const unsigned char *in, unsigned char *out, size_t le
 }
 
 static int
+kuznyechik_ctr_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
+    const unsigned char *iv, int enc)
+{
+	if (iv)
+		memset(ctx->iv + 8, 0, 8);
+
+	if (!key)
+		return 1;
+
+	return kuznyechik_init_key(ctx, key, iv, enc);
+}
+
+static int
 kuznyechik_ctr_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in,
 		size_t len)
 {
@@ -120,8 +133,8 @@ IMPLEMENT_BLOCK_CIPHER(kuznyechik, ks, Kuznyechik, EVP_KUZNYECHIK_CTX,
 		kuznyechik_ctl)
 
 BLOCK_CIPHER_def1(kuznyechik, ctr, ctr, CTR, EVP_KUZNYECHIK_CTX,
-		NID_kuznyechik, 1, 32, 8, 0,
-		kuznyechik_init_key, NULL,
+		NID_kuznyechik, 1, 32, 8, EVP_CIPH_ALWAYS_CALL_INIT,
+		kuznyechik_ctr_init_key, NULL,
 		EVP_CIPHER_set_asn1_iv,
 		EVP_CIPHER_get_asn1_iv,
 		kuznyechik_ctl)
