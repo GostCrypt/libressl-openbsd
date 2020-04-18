@@ -153,6 +153,8 @@
 
 #include <openssl/bio.h>
 
+#include <openssl/kdftree.h>
+
 #ifndef OPENSSL_NO_DEPRECATED
 #include <openssl/buffer.h>
 #include <openssl/crypto.h>
@@ -397,6 +399,10 @@ struct ssl_cipher_st {
 	unsigned long algorithm2;	/* Extra flags */
 	int strength_bits;		/* Number of bits really used */
 	int alg_bits;			/* Number of bits for algorithm */
+
+#ifndef OPENSSL_NO_GOST
+	const TLSTREE_CONST *tlstree;	/* TLSTREE parameters */
+#endif
 };
 
 
