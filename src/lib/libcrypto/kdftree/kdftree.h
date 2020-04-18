@@ -40,6 +40,29 @@ int KDF_TREE_SIMPLE(const EVP_MD *md, ENGINE *impl,
 		const unsigned char *seed, unsigned int seed_length,
 		unsigned char *out);
 
+/* TLSTREE is an external re-keying function (see
+ * draft-smyshlyaev-tls12-gost-suites Section 8 for the definition, RFC 8645
+ * Section 5.2.2 for the discussion of the approach. */
+
+/* Opaque */
+typedef struct TLSTREE_CTX_st TLSTREE_CTX;
+
+typedef struct tlstree_const_st {
+	uint64_t c1, c2, c3;
+} TLSTREE_CONST;
+
+TLSTREE_CTX *TLSTREE_CTX_new(void);
+void TLSTREE_CTX_free(TLSTREE_CTX *ctx);
+
+int TLSTREE_Init(TLSTREE_CTX *ctx,
+		const TLSTREE_CONST *tlsconst,
+		const EVP_MD *md, ENGINE *impl,
+		const unsigned char *key,
+		int key_length);
+int TLSTREE_GET(TLSTREE_CTX *ctx,
+		unsigned char *seq,
+		unsigned char *out);
+
 #if defined(__cplusplus)
 }  /* extern C */
 #endif

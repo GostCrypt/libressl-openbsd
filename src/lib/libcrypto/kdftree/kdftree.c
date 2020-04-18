@@ -18,6 +18,7 @@
 
 #include <openssl/kdftree.h>
 #include <openssl/hmac.h>
+#include "kdftree_locl.h"
 
 #include <string.h>
 
@@ -26,7 +27,7 @@
 			 *((c)++)=(unsigned char)(((l)>> 8)&0xff),	\
 			 *((c)++)=(unsigned char)(((l)    )&0xff))
 
-static int
+int
 kdf_tree_block(HMAC_CTX *ctx,
 		const unsigned char *i, unsigned int i_length,
 		const unsigned char *label, unsigned int label_length,
