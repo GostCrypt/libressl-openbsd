@@ -411,6 +411,7 @@ tls1_change_cipher_state_cipher(SSL *s, char is_read,
 	const EVP_MD *mac;
 	const EVP_CIPHER *mac_cipher;
 	int mac_type;
+	SSL3_RW_STATE_INTERNAL *rws;
 
 	cipher = S3I(s)->tmp.new_sym_enc;
 	mac = S3I(s)->tmp.new_hash;
@@ -426,6 +427,7 @@ tls1_change_cipher_state_cipher(SSL *s, char is_read,
 		if ((mac_ctx = EVP_MD_CTX_new()) == NULL)
 			goto err;
 		s->read_hash = mac_ctx;
+		rws = &S3I(s)->read;
 	} else {
 		/*
 		 * DTLS fragments retain a pointer to the compression, cipher
@@ -443,6 +445,7 @@ tls1_change_cipher_state_cipher(SSL *s, char is_read,
 		if ((mac_ctx = EVP_MD_CTX_new()) == NULL)
 			goto err;
 		s->internal->write_hash = mac_ctx;
+		rws = &S3I(s)->write;
 	}
 
 	EVP_CipherInit_ex(cipher_ctx, cipher, NULL, key, iv, !is_read);
@@ -464,6 +467,24 @@ tls1_change_cipher_state_cipher(SSL *s, char is_read,
 		s->read_mac_size = mac_size;
 	else
 		s->internal->write_mac_size = mac_size;
+
+#ifndef OPENSSL_NO_GOST
+	if (s->session->cipher->tlstree) {
+		rws->tlstree_cipher = TLSTREE_CTX_new();
+		rws->tlstree_mac = TLSTREE_CTX_new();
+		if (rws->tlstree_cipher == NULL ||
+		    rws->tlstree_mac == NULL ||
+		    !TLSTREE_Init(rws->tlstree_cipher,
+			    s->session->cipher->tlstree,
+			    EVP_streebog256(), NULL,
+			    key, key_len) ||
+		    !TLSTREE_Init(rws->tlstree_mac,
+			    s->session->cipher->tlstree,
+			    EVP_streebog256(), NULL,
+			    mac_secret, mac_secret_size))
+			goto err;
+	}
+#endif
 
 	if (S3I(s)->hs.new_cipher->algorithm_enc == SSL_eGOST2814789CNT) {
 		int nid;
@@ -904,6 +925,14 @@ tls1_enc(SSL *s, int send)
 				return 0;
 		}
 
+#ifndef OPENSSL_NO_GOST
+		if (rws->tlstree_cipher != NULL) {
+			unsigned char tmp[EVP_MAX_KEY_LENGTH];
+			if (!TLSTREE_GET(rws->tlstree_cipher, rws->sequence, tmp) ||
+			    !EVP_CipherInit_ex(ds, NULL, NULL, tmp, NULL, -1))
+				return 0;
+		}
+#endif
 		if (add_nonce) {
 			unsigned char new_iv[EVP_MAX_IV_LENGTH];
 			int iv_size = rws->cipher_iv_size;
@@ -974,6 +1003,7 @@ tls1_mac(SSL *ssl, unsigned char *md, int send)
 	int stream_mac = ssl->session && ssl->session->cipher ?
 		ssl->session->cipher->algorithm2 & TLS1_STREAM_MAC :
 		0;
+	SSL3_RW_STATE_INTERNAL *rws;
 	int t;
 
 	if (send) {
@@ -981,11 +1011,13 @@ tls1_mac(SSL *ssl, unsigned char *md, int send)
 		seq = &(ssl->s3->internal->write.sequence[0]);
 		hash = ssl->internal->write_hash;
 		t = ssl->internal->write_mac_size;
+		rws = &S3I(ssl)->write;
 	} else {
 		rec = &(ssl->s3->internal->rrec);
 		seq = &(ssl->s3->internal->read.sequence[0]);
 		hash = ssl->read_hash;
 		t = ssl->read_mac_size;
+		rws = &S3I(ssl)->read;
 	}
 
 	OPENSSL_assert(t >= 0);
@@ -1028,6 +1060,16 @@ tls1_mac(SSL *ssl, unsigned char *md, int send)
 		    ssl->s3->internal->read.mac_secret_size))
 			return -1;
 	} else {
+#ifndef OPENSSL_NO_GOST
+		if (rws->tlstree_mac != NULL) {
+			unsigned char tmp[EVP_MAX_KEY_LENGTH];
+			if (mac_ctx->pctx == NULL ||
+			    !TLSTREE_GET(rws->tlstree_mac, seq, tmp) ||
+			    EVP_PKEY_CTX_ctrl(mac_ctx->pctx, -1, EVP_PKEY_OP_SIGNCTX,
+				    EVP_PKEY_CTRL_SET_MAC_KEY, rws->mac_secret_size, tmp) <= 0)
+				return -1;
+		}
+#endif
 		EVP_DigestSignUpdate(mac_ctx, header, sizeof(header));
 		EVP_DigestSignUpdate(mac_ctx, rec->input, rec->length);
 		t = EVP_DigestSignFinal(mac_ctx, md, &md_size);

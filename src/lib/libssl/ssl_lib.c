@@ -2569,6 +2569,13 @@ ssl_clear_cipher_read_state(SSL *s)
 		free(s->internal->aead_read_ctx);
 		s->internal->aead_read_ctx = NULL;
 	}
+
+#ifndef OPENSSL_NO_GOST
+	if (S3I(s)->read.tlstree_cipher != NULL)
+		TLSTREE_CTX_free(S3I(s)->read.tlstree_cipher);
+	if (S3I(s)->read.tlstree_mac != NULL)
+		TLSTREE_CTX_free(S3I(s)->read.tlstree_mac);
+#endif
 }
 
 void
@@ -2585,6 +2592,13 @@ ssl_clear_cipher_write_state(SSL *s)
 		free(s->internal->aead_write_ctx);
 		s->internal->aead_write_ctx = NULL;
 	}
+
+#ifndef OPENSSL_NO_GOST
+	if (S3I(s)->write.tlstree_cipher != NULL)
+		TLSTREE_CTX_free(S3I(s)->write.tlstree_cipher);
+	if (S3I(s)->write.tlstree_mac != NULL)
+		TLSTREE_CTX_free(S3I(s)->write.tlstree_mac);
+#endif
 }
 
 /* Fix this function so that it takes an optional type parameter */

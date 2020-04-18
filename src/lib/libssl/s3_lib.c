@@ -169,6 +169,18 @@
  */
 #define FIXED_NONCE_LEN(x) (((x / 2) & 0xf) << 24)
 
+static const TLSTREE_CONST tlstree_magma_ctr_omac = {
+	.c1 = UINT64_C(0xFFFFFFC000000000),
+	.c2 = UINT64_C(0xFFFFFFFFFE000000),
+	.c3 = UINT64_C(0xFFFFFFFFFFFFF000),
+};
+
+static const TLSTREE_CONST tlstree_kuznyechik_ctr_omac = {
+	.c1 = UINT64_C(0xFFFFFFFF00000000),
+	.c2 = UINT64_C(0xFFFFFFFFFFF80000),
+	.c3 = UINT64_C(0xFFFFFFFFFFFFFFC0),
+};
+
 /* list of available SSLv3 ciphers (sorted by id) */
 SSL_CIPHER ssl3_ciphers[] = {
 
@@ -1318,7 +1330,8 @@ SSL_CIPHER ssl3_ciphers[] = {
 		.algo_strength = SSL_HIGH,
 		.algorithm2 = SSL_HANDSHAKE_MAC_STREEBOG256|TLS1_PRF_STREEBOG256|TLS1_NONCE_ADD_SEQUENCE,
 		.strength_bits = 256,
-		.alg_bits = 256
+		.alg_bits = 256,
+		.tlstree = &tlstree_kuznyechik_ctr_omac,
 	},
 
 	/* Cipher C101 */
@@ -1334,7 +1347,8 @@ SSL_CIPHER ssl3_ciphers[] = {
 		.algo_strength = SSL_HIGH,
 		.algorithm2 = SSL_HANDSHAKE_MAC_STREEBOG256|TLS1_PRF_STREEBOG256|TLS1_NONCE_ADD_SEQUENCE,
 		.strength_bits = 256,
-		.alg_bits = 256
+		.alg_bits = 256,
+		.tlstree = &tlstree_magma_ctr_omac,
 	},
 
 	/* Cipher C102 */

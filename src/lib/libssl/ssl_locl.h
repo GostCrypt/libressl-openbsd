@@ -804,6 +804,10 @@ typedef struct ssl3_rw_state_internal_st {
 	unsigned char mac_secret[EVP_MAX_MD_SIZE];
 	int cipher_iv_size;
 	unsigned char cipher_iv[EVP_MAX_IV_LENGTH];
+#ifndef OPENSSL_NO_GOST
+	TLSTREE_CTX *tlstree_cipher;
+	TLSTREE_CTX *tlstree_mac;
+#endif
 } SSL3_RW_STATE_INTERNAL;
 
 typedef struct ssl3_state_internal_st {
